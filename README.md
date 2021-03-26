@@ -1,4 +1,4 @@
-# gpu_parallel
+# GPUParallel
 Joblib-like interface for parallel GPU computations (e.g. data preprocessing).
 
 ## Install
