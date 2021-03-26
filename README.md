@@ -46,5 +46,8 @@ def perform(img, worker_id=None, gpu_id=None):
     return result
     
 gp = GPUParallel(n_gpu=16, n_workers_per_gpu=2, init_fn=init)
-results = gp(partial(perform, idx) for img in images_dataset)
+overall_results = []
+for folder_images in folders:
+    folder_results = gp(partial(perform, idx) for img in folder_images)
+    overall_results.extend(folder_results)
 ```
