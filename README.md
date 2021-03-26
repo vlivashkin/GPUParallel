@@ -15,8 +15,8 @@ from functools import partial
 
 def perform(idx, worker_id=None, gpu_id=None):
     """
-    Function to be performed on worker.
-    Variables `worker_id` and `gpu_id` will be filled automatically with actual values of a current worker.
+    Function to be performed on worker. Variables `worker_id` and `gpu_id` will be filled 
+    automatically with actual values of a current worker.
     """
     print(f'Hello world #{idx} from worker #{worker_id} with GPU#{gpu_id}!')
     
