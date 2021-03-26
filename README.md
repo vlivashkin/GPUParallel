@@ -35,7 +35,7 @@ def init(worker_id=None, gpu_id=None):
     """
     global model
     
-    model = TheModelClass(*args, **kwargs)
+    model = TheModelClass()
     model.load_state_dict(torch.load(PATH))
     model.to(gpu_id)
     model.eval()
