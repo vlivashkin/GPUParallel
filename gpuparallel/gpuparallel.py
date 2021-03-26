@@ -20,7 +20,7 @@ def run_task(func, result_queue):
 
 
 class GPUParallel:
-    def __init__(self, n_gpu, n_workers_per_gpu, init_fn=None, verbose=True, tqdm=True):
+    def __init__(self, n_gpu=1, n_workers_per_gpu=1, init_fn=None, verbose=True, tqdm=True):
         self.n_gpu = n_gpu
         self.n_workers_per_gpu = n_workers_per_gpu
         self.verbose = verbose
