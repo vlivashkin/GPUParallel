@@ -40,6 +40,10 @@ class GPUParallel:
                          maxtasksperchild=None)
 
         self.result_queue = m.Queue()
+        
+    def __del__(self):
+        self.pool.close()
+        self.pool.join()
 
     def init_worker(self, init_fn=None):
         global worker_id, gpu_id
@@ -70,8 +74,5 @@ class GPUParallel:
 
         if self.verbose:
             print('All results are received!')
-
-        self.pool.close()
-        self.pool.join()
 
         return results
