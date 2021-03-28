@@ -1,3 +1,4 @@
+import multiprocessing
 import unittest
 from functools import partial
 
@@ -14,6 +15,7 @@ class TestGPUParallel(unittest.TestCase):
 
         def perform(worker_id=None, gpu_id=None):
             global result
+            multiprocessing.get_logger().info(f'Perform {result}')
             return result
 
         results = GPUParallel(n_gpu=2, init_fn=init)(perform for _ in range(10))
@@ -23,7 +25,7 @@ class TestGPUParallel(unittest.TestCase):
         print('Run Test: test_results')
 
         def perform(idx, worker_id=None, gpu_id=None):
-            print(f'Perform {idx}')
+            multiprocessing.get_logger().info(f'Perform {idx}')
             return idx
 
         true_seq = list(range(10))
@@ -34,7 +36,7 @@ class TestGPUParallel(unittest.TestCase):
         print('Run Test: test_multicall')
 
         def perform(idx, worker_id=None, gpu_id=None):
-            print(f'Perform {idx}')
+            multiprocessing.get_logger().info(f'Perform {idx}')
             return idx
 
         true_seq1, true_seq2 = list(range(10)), list(range(10, 20))
