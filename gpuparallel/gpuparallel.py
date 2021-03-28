@@ -4,7 +4,7 @@ from functools import partial
 from multiprocessing import Pool, Manager, Queue
 from typing import List, Iterable, Optional, Callable
 
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 
 def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None, verbose=True):
