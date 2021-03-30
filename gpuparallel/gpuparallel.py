@@ -59,10 +59,6 @@ class GPUParallel:
                 worker_id = gpu_id * self.n_workers_per_gpu + idx
                 self.gpu_queue.put((worker_id, gpu_id))
 
-        if self.verbose:
-            mp.log_to_stderr()
-            mp.get_logger().setLevel('INFO')
-
         initializer = partial(_init_worker, gpu_queue=self.gpu_queue, init_fn=init_fn, verbose=self.verbose)
         self.pool = Pool(processes=self.n_gpu * self.n_workers_per_gpu, initializer=initializer,
                          maxtasksperchild=None)
