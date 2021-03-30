@@ -12,13 +12,14 @@ python3 -m pip install git+git://github.com/vlivashkin/gpuparallel.git
 ```python
 from gpuparallel import GPUParallel
 from functools import partial
+import multiprocessing as mp
 
 def perform(idx, worker_id=None, gpu_id=None):
     """
     Function to be performed on worker. Variables `worker_id` and `gpu_id` will be filled 
     automatically with actual values of a current worker.
     """
-    print(f'Hello world #{idx} from worker #{worker_id} with GPU#{gpu_id}!')
+    mp.get_logger().info(f'Hello world #{idx} from worker #{worker_id} with GPU#{gpu_id}!')
     
 GPUParallel(n_gpu=2)(partial(perform, idx) for idx in range(100))
 ```
