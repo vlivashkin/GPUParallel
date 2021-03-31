@@ -41,7 +41,8 @@ class GPUParallel:
         :param init_fn: Function which will be called during worker init.
                         Function must have parameters `worker_id` and `gpu_id`.
                         Helpful to init all common stuff (e.g. neural networks) here.
-        :param verbose: Allow additional messages.
+        :param verbose: Allow additional messages. Note that messages inside `perform` should be sent to `mp.get_logger().info(message)`.
+                        To make them visible, you need to run `mp.log_to_stderr(); mp.get_logger().setLevel('INFO')`
         :param progressbar: Allow to use tqdm progressbar.
         :param ignore_errors: Either ignore errors inside tasks or raise them.
         """
