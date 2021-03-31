@@ -4,8 +4,6 @@ from functools import partial
 from multiprocessing import Pool, Manager, Queue
 from typing import List, Iterable, Optional, Callable
 
-from tqdm.auto import tqdm
-
 
 def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None, verbose=True):
     global worker_id, gpu_id
@@ -97,6 +95,7 @@ class GPUParallel:
 
         results = []
         if self.progressbar:
+            from tqdm.auto import tqdm
             with tqdm(total=n_tasks) as pbar:
                 for idx in range(n_tasks):
                     result = self.result_queue.get()
