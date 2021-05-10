@@ -1,8 +1,5 @@
 API Reference
-===================
-
-gpuparallel module
-------------------------------
+=============
 
 .. automodule:: gpuparallel
    :members:

@@ -9,54 +9,67 @@ Quickstart
 Basic usage
 -----------
 
-Create 2 workers to say hello::
+Calc squares of numbers::
 
-    from gpuparallel import GPUParallel
-    from functools import partial
-    import multiprocessing as mp
+   import torch
+   from gpuparallel import GPUParallel, delayed
 
-    mp.log_to_stderr()
-    mp.get_logger().setLevel('INFO')
+   def perform(idx, gpu_id, **kwargs):
+       tensor = torch.Tensor([idx]).to(gpu_id)
+       return (tensor * tensor).item()
 
-    def perform(idx, worker_id=None, gpu_id=None):
-        """
-        Function to be performed on worker. Variables `worker_id` and `gpu_id` will be
-        filled automatically with actual values of a current worker.
-        """
-        hi = f'Hello world #{idx} from worker #{worker_id} with GPU#{gpu_id}!'
-        mp.get_logger().info(hi)
+   result = GPUParallel(n_gpu=2)(delayed(perform)(idx) for idx in range(5))
+   print(sorted(result))  # [0.0, 1.0, 4.0, 9.0, 16.0]
 
-    GPUParallel(n_gpu=2)(partial(perform, idx) for idx in range(100))
+Initialize networks on worker init
+----------------------------------
 
-Advanced usage
---------------
+Function ``init_fn`` is called on init of every worker. All common resources (e.g. networks) can be initialized here.
+In this example we create 32 workers on 16 GPUs, init ``model`` when workers are starting and then reuse workers for several batches of tasks::
 
-Create 32 workers on 16 GPUs, init ``TheModel`` when workers are starting and then reuse workers for several batches of tasks::
-
-   from gpuparallel import GPUParallel
-   from functools import partial
+   from gpuparallel import GPUParallel, delayed
 
    def init(gpu_id=None, **kwargs):
-       """
-       This function will be called on init of every worker.
-       All common resources (e.g. networks) can be initialized here.
-       """
        global model
-
-       model = TheModel()
-       model.load_state_dict(torch.load(PATH))
-       model.to(gpu_id)
-       model.eval()
+       model = load_model().to(gpu_id)
 
    def perform(img, gpu_id=None, **kwargs):
        global model
+       return model(img.to(gpu_id))
 
-       img = img.to(gpu_id)
-       result = model(img)
-       return result
+   gp = GPUParallel(n_gpu=16, n_workers_per_gpu=2, init_fn=init)
+   results = gp(delayed(perform)(img) for img in fnames)
+
+Reuse initialized workers
+-------------------------
+
+Once workers are initialized, they keep live until ``GPUParallel`` object exist.
+You can perform several queues of tasks without reinitializing worker resources::
 
    gp = GPUParallel(n_gpu=16, n_workers_per_gpu=2, init_fn=init)
    overall_results = []
    for folder_images in folders:
-       folder_results = gp(partial(perform, img) for img in folder_images)
+       folder_results = gp(delayed(perform)(img) for img in folder_images)
        overall_results.extend(folder_results)
+   del gp  # this will close process pool to free memory
+
+Simple logging from workers
+---------------------------
+
+Use ``log_to_stderr()`` call to init logging, and ``log.info(message)`` to log info from workers::
+
+   from gpuparallel import GPUParallel, delayed, log_to_stderr, log
+
+   log_to_stderr()
+
+   def perform(idx, worker_id=None, gpu_id=None):
+       hi = f'Hello world #{idx} from worker #{worker_id} with GPU#{gpu_id}!'
+       log.info(hi)
+
+   GPUParallel(n_gpu=2)(delayed(perform)(idx) for idx in range(2))
+
+It will return::
+
+   [INFO/Worker-1(GPU1)]:Hello world #1 from worker #1 with GPU#1!
+   [INFO/Worker-0(GPU0)]:Hello world #0 from worker #0 with GPU#0!
+
