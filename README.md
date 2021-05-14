@@ -64,7 +64,7 @@ del gp  # this will close process pool to free memory
 ```
 
 ### Simple logging from workers
-Inside workers you won't see output of `print()`, but 
+`print()` inside a worker won't be seen in the main process, but you still can use logging to stderr of the main process.
 Use `log_to_stderr()` call to init logging, and `log.info(message)` to log info from workers
 ```python
 from gpuparallel import GPUParallel, delayed, log_to_stderr, log
