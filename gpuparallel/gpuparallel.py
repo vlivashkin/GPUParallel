@@ -2,7 +2,7 @@ import logging
 import traceback
 from functools import partial
 from multiprocessing import Pool, Manager, Queue
-from typing import List, Iterable, Optional, Callable
+from typing import List, Iterable, Optional, Callable, Union, Generator
 
 from .utils import log
 
@@ -36,7 +36,7 @@ def _run_task(func: Callable, result_queue: Queue, ignore_errors=True):
 
 class GPUParallel:
     def __init__(self, n_gpu=1, n_workers_per_gpu=1, init_fn: Optional[Callable] = None,
-                 progressbar=True, ignore_errors=True):
+                 return_generator=False, progressbar=True, ignore_errors=True):
         """
         :param n_gpu:
             Number of GPUs to use. The library doesn't check if GPUs really available, it is simply provide
@@ -53,6 +53,7 @@ class GPUParallel:
         self.debug_mode = n_gpu == 0
         self.n_gpu = n_gpu
         self.n_workers_per_gpu = n_workers_per_gpu
+        self.return_generator = return_generator
         self.progressbar = progressbar
         self.ignore_errors = ignore_errors
 
@@ -84,47 +85,43 @@ class GPUParallel:
             self.pool.join()
 
     def _call_sync(self, tasks: Iterable) -> List:
+        log.warning(f'Debug mode is turned on. All tasks will be run in the main process.')
+
         tasks = list(tasks)
         if self.progressbar:
             from tqdm.auto import tqdm
-            results = [task(worker_id=0, gpu_id=0) for task in tqdm(tasks)]
-        else:
-            results = [task(worker_id=0, gpu_id=0) for task in tasks]
-        return results
+            tasks = tqdm(tasks)
+        for task in tasks:
+            yield task(worker_id=0, gpu_id=0)
 
-    def __call__(self, tasks: Iterable) -> List:
+    def _call_async(self, tasks: Iterable) -> Iterable:
+        n_tasks = 0
+        for task in tasks:
+            self.pool.apply_async(_run_task, (task, self.result_queue, self.ignore_errors))
+            n_tasks += 1
+        log.debug(f'Submitted {n_tasks} tasks')
+
+        if self.progressbar:
+            from tqdm.auto import tqdm
+            with tqdm(total=n_tasks) as pbar:
+                for idx in range(n_tasks):
+                    yield self.result_queue.get()
+                    pbar.update(1)
+        else:
+            for _ in range(n_tasks):
+                yield self.result_queue.get()
+
+        log.debug('All results are received!')
+
+    def __call__(self, tasks: Iterable) -> Union[List, Generator]:
         """
         Function which submits tasks for pool and collects the results of computations.
 
         :param tasks:
             List or generator with callable functions to be executed.
             Functions must have parameters ``worker_id`` and ``gpu_id`` (or ``**kwargs``).
-        :return: List of results
+        :return: List of results or generator
         """
 
-        if self.debug_mode:
-            return self._call_sync(tasks)
-
-        n_tasks = 0
-        for task in tasks:
-            self.pool.apply_async(_run_task, (task, self.result_queue, self.ignore_errors))
-            n_tasks += 1
-
-        log.debug(f'Submitted {n_tasks} tasks')
-
-        results = []
-        if self.progressbar:
-            from tqdm.auto import tqdm
-            with tqdm(total=n_tasks) as pbar:
-                for idx in range(n_tasks):
-                    result = self.result_queue.get()
-                    results.append(result)
-                    pbar.update(1)
-        else:
-            for _ in range(n_tasks):
-                result = self.result_queue.get()
-                results.append(result)
-
-        log.debug('All results are received!')
-
-        return results
+        generator = self._call_async(tasks) if not self.debug_mode else self._call_sync(tasks)
+        return generator if self.return_generator else [x for x in generator]
