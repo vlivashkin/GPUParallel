@@ -61,22 +61,21 @@ class GPUParallel:
         """
         assert not (n_gpu is not None and device_ids is not None), "Both 'n_gpu' and 'device_ids' cannot de filled"
 
-        self.debug_mode = debug
-        if not self.debug_mode:
-            if device_ids is not None:
-                assert len(device_ids) > 0, 'len(device_ids) must be > 0'
-                self.n_gpu = len(device_ids)
-                self.device_ids = device_ids
-            else:
-                n_gpu = n_gpu if n_gpu is not None else 1
-                assert n_gpu > 0, 'n_gpu must be > 0'
-                self.n_gpu = n_gpu
-                self.device_ids = [f'cuda:{idx}' for idx in range(n_gpu)]
-
         self.n_workers_per_gpu = n_workers_per_gpu
         self.return_generator = return_generator
         self.progressbar = progressbar
         self.ignore_errors = ignore_errors
+        self.debug_mode = debug
+
+        if device_ids is not None:
+            assert len(device_ids) > 0, 'len(device_ids) must be > 0'
+            self.n_gpu = len(device_ids)
+            self.device_ids = device_ids
+        else:
+            n_gpu = n_gpu if n_gpu is not None else 1
+            assert n_gpu > 0, 'n_gpu must be > 0'
+            self.n_gpu = n_gpu
+            self.device_ids = [f'cuda:{idx}' for idx in range(n_gpu)]
 
         if not self.debug_mode:
             m = Manager()
