@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.com/vlivashkin/GPUParallel.svg?branch=main)](https://travis-ci.com/vlivashkin/gpuparallel)
-[![codecov](https://codecov.io/gh/vlivashkin/GPUParallel/branch/master/graph/badge.svg)](https://codecov.io/gh/vlivashkin/GPUParallel)
+[![codecov](https://codecov.io/gh/vlivashkin/GPUParallel/branch/main/graph/badge.svg?token=eo2uyiDmj1)](https://codecov.io/gh/vlivashkin/GPUParallel)
 [![Documentation Status](https://readthedocs.org/projects/gpuparallel/badge/?version=latest)](https://gpuparallel.readthedocs.io/en/latest/?badge=latest)
 [![pypi](https://pypip.in/v/gpuparallel/badge.svg)](https://pypi.python.org/pypi/gpuparallel/)
 # GPUParallel
