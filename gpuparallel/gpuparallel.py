@@ -15,7 +15,7 @@ def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None):
         init_fn(worker_id=worker_id, device_id=device_id)
 
     if len(log.handlers) > 0:
-        fmt = logging.Formatter(f'[%(levelname)s/Worker-{worker_id}(GPU{device_id})]:%(message)s')
+        fmt = logging.Formatter(f'[%(levelname)s/Worker-{worker_id}({device_id})]:%(message)s')
         log.handlers[0].setFormatter(fmt)
 
     log.debug(f'Worker #{worker_id} with GPU{device_id} initialized.')
