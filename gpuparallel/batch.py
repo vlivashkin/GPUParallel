@@ -1,8 +1,11 @@
 import math
-from typing import List, Union, Generator, Callable, Tuple, Dict, Sequence
+import multiprocessing as mp
+from typing import Generator, Callable, Sequence
 
 from .gpuparallel import GPUParallel
 from .utils import delayed
+
+log = mp.get_logger()
 
 
 class BatchGPUParallel(GPUParallel):
@@ -13,8 +16,7 @@ class BatchGPUParallel(GPUParallel):
 
         :param task_fn: Task to be executed
         :param batch_size: Batch size
-        :param flat_result: Either unbatch results or not.
-            Param assumes that result of ``task_fn`` is an Iterable with len equal ``batch_size``.
+        :param flat_result: Unbatch results. Works only for single tensor output.
         """
         super().__init__(*args, **kwargs)
 
@@ -22,25 +24,47 @@ class BatchGPUParallel(GPUParallel):
         self.batch_size = batch_size
         self.flat_result = flat_result
 
-    def __call__(self, tasks: Sequence[Tuple[List, Dict]]) -> Union[List, Generator]:
+    def __call__(self, *args, **kwargs) -> Generator:
         """
-        :param tasks: List of parameters for ``task_fn``. Every element is (List of *args, Dict of **kwargs).
+        All input parameters should have equal first axis to be batched.
+        First arg/kwarg is used to determine size of the dataset.
+        Inputs with other shape (or not Sequence typed) will be copied to every worker without batching.
         :return: Batched result
         """
-        n_batches = math.ceil(len(tasks) / self.batch_size)
+        n_samples = len(args[0]) if len(args) > 0 else len(kwargs[list(kwargs.keys())[0]])
+        n_batches = math.ceil(n_samples / self.batch_size)
+        will_be_batched_args, will_be_batched_kwargs = set(), set()
+        wont_be_batched_args, wont_be_batched_kwargs = set(), set()
+        for arg_idx, arg in enumerate(args):
+            if isinstance(arg, Sequence) and len(arg) == n_samples:
+                will_be_batched_args.add(arg_idx)
+            else:
+                wont_be_batched_args.add(arg_idx)
+        for kwarg_key, kwarg_value in kwargs.items():
+            if isinstance(kwarg_value, Sequence) and len(kwarg_value) == n_samples:
+                will_be_batched_kwargs.add(kwarg_key)
+            else:
+                wont_be_batched_kwargs.add(kwarg_key)
+        log.info(f'Args: {will_be_batched_args} will be batched, {wont_be_batched_args} will be copied')
+        log.info(f'Kwargs: {will_be_batched_kwargs} will be batched, {wont_be_batched_kwargs} will be copied')
+        log.info(f'Total samples: {n_samples}, batches: {n_batches}')
+
         batches = []
         for batch_idx in range(n_batches):
-            tasks_of_batch = tasks[batch_idx * self.batch_size: (batch_idx + 1) * self.batch_size]
-            collated_task = ([], {})
-            for arg_idx in range(len(tasks_of_batch[0][0])):
-                collated_arg = [tasks_of_batch[idx][0][arg_idx] for idx in range(len(tasks_of_batch))]
-                collated_task[0].append(collated_arg)
-            for kwarg_key in tasks_of_batch[0][1].keys():
-                collated_kwarg = [tasks_of_batch[idx][1][kwarg_key] for idx in range(len(tasks_of_batch))]
-                collated_task[1][kwarg_key] = collated_kwarg
-            batches.append(delayed(self.task_fn)(*collated_task[0], **collated_task[1]))
+            slce = slice(batch_idx * self.batch_size, (batch_idx + 1) * self.batch_size)
+            batch_args_kwargs = ([], {})
+            for arg_idx, arg in enumerate(args):
+                batch_arg = arg[slce] if arg_idx in will_be_batched_args else arg
+                batch_args_kwargs[0].append(batch_arg)
+            for kwarg_key, kwarg_value in kwargs.items():
+                batch_kwarg = kwarg_value[slce] if kwarg_key in will_be_batched_kwargs else kwarg_value
+                batch_args_kwargs[1][kwarg_key] = batch_kwarg
+            batches.append(delayed(self.task_fn)(*batch_args_kwargs[0], **batch_args_kwargs[1]))
 
         result = super().__call__(batches)
-        if self.flat_result:
-            result = [item for sublist in result for item in sublist]
-        return result
+        for batch in result:
+            if self.flat_result:
+                for item in batch:
+                    yield item
+            else:
+                yield batch
