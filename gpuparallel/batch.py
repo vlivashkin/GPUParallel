@@ -36,12 +36,12 @@ class BatchGPUParallel(GPUParallel):
         will_be_batched_args, will_be_batched_kwargs = set(), set()
         wont_be_batched_args, wont_be_batched_kwargs = set(), set()
         for arg_idx, arg in enumerate(args):
-            if isinstance(arg, Sequence) and len(arg) == n_samples:
+            if hasattr(arg, '__len__') and len(arg) == n_samples:
                 will_be_batched_args.add(arg_idx)
             else:
                 wont_be_batched_args.add(arg_idx)
         for kwarg_key, kwarg_value in kwargs.items():
-            if isinstance(kwarg_value, Sequence) and len(kwarg_value) == n_samples:
+            if hasattr(kwarg_value, '__len__') and len(kwarg_value) == n_samples:
                 will_be_batched_kwargs.add(kwarg_key)
             else:
                 wont_be_batched_kwargs.add(kwarg_key)
