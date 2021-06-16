@@ -1,9 +1,11 @@
+import random
 import unittest
+from time import sleep
 from typing import Generator
 
 from gpuparallel import GPUParallel, delayed, log_to_stderr
 
-log_to_stderr()
+log_to_stderr(log_level='DEBUG')
 
 
 def test_init__init(worker_id=None, **kwargs):
@@ -22,6 +24,12 @@ def task_return_identity(value, **kwargs):
 
 def task_return_device_id(device_id, **kwargs):
     return device_id
+
+
+def task_wait_random_time(idx, **kwargs):
+    time_to_sleep = random.random()
+    sleep(time_to_sleep)
+    return idx
 
 
 class TestGPUParallel(unittest.TestCase):
@@ -60,6 +68,12 @@ class TestGPUParallel(unittest.TestCase):
         gpup = GPUParallel(device_ids=true_device_ids, progressbar=False)
         results = gpup(delayed(task_return_device_id)() for _ in range(100))
         self.assertEqual(set(results), set(true_device_ids))
+
+    def test_preserve_order(self):
+        true_sequence = list(range(100))
+        gpup = GPUParallel(n_gpu=20, preserve_order=True, progressbar=False)
+        results = gpup(delayed(task_wait_random_time)(idx) for idx in true_sequence)
+        self.assertEqual(results, true_sequence)
 
 
 if __name__ == '__main__':
