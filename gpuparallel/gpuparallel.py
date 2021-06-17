@@ -37,7 +37,7 @@ def _run_task(func: Callable, task_idx, result_queue: Queue, ignore_errors=True)
 class GPUParallel:
     def __init__(self, device_ids: Optional[List[str]] = None, n_gpu: Optional[Union[int, str]] = None,
                  n_workers_per_gpu=1, init_fn: Optional[Callable] = None, preserve_order=True,
-                 progressbar=True, ignore_errors=True, debug=False):
+                 progressbar=True, ignore_errors=False, debug=False):
         """
         Parallel execution of functions passed to ``__call__``.
 
