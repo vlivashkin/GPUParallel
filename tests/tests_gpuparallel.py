@@ -5,7 +5,7 @@ from typing import Generator
 
 from gpuparallel import GPUParallel, delayed, log_to_stderr
 
-log_to_stderr(log_level='DEBUG')
+log_to_stderr(log_level='INFO')
 
 
 def test_init__init(worker_id=None, **kwargs):
