@@ -72,3 +72,21 @@ class TestBatchGPUParallel(unittest.TestCase):
                                  n_gpu=2, progressbar=False)
         flat_results = np.array(list(bgpup(arr)))
         self.assertEqual(arr.shape, flat_results.shape)
+
+    def test_run_twice(self):
+        for _ in range(2):
+            arr = np.zeros((102, 103))
+            bgpup = BatchGPUParallel(task_fn=task_return_identity, batch_size=2, flat_result=True,
+                                     n_gpu=16, progressbar=False)
+            flat_results = np.array(list(bgpup(arr)))
+            self.assertEqual(arr.shape, flat_results.shape)
+
+    def test_add_tasks_twice(self):
+        arr = np.zeros((102, 103))
+        bgpup = BatchGPUParallel(task_fn=task_return_identity, batch_size=2, flat_result=True,
+                                 n_gpu=16, progressbar=False)
+        flat_results = np.array(list(bgpup(arr)) + list(bgpup(arr)))
+
+        true_shape = list(arr.shape)
+        true_shape[0] *= 2
+        self.assertEqual(tuple(true_shape), flat_results.shape)
