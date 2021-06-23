@@ -28,9 +28,11 @@ def _run_task(func: Callable, task_idx, result_queue: Queue, ignore_errors=True)
         result = func(worker_id=worker_id, device_id=device_id)
         result_queue.put((task_idx, result))
     except Exception as e:
-        log.error(traceback.format_exc())
-        result_queue.put((task_idx, None))  # __call__ expects to get number of results equal to number of tasks
-        if not ignore_errors:
+        log.error(f'Error during task #{task_idx}', exc_info=True)
+        if ignore_errors:
+            log.warning(f'Exception will be ignored according to ignore_errors flag')
+            result_queue.put((task_idx, None))  # __call__ expects to get number of results equal to number of tasks
+        else:
             raise e
 
 
@@ -92,7 +94,7 @@ class GPUParallel:
 
             self.result_queue = m.Queue()
         else:  # debug mode; run init in the same process
-            log.warning('Debug mode. All tasks will be run in this process for debug purposes.')
+            log.warning('Debug mode. All tasks will be run in main process for debug purposes.')
             if init_fn is not None:
                 init_fn(worker_id=0, device_id=self.device_ids[0])
 
@@ -102,8 +104,11 @@ class GPUParallel:
         This allows to use ``__call__`` multiple times with the same initialized workers.
         """
         if not self.debug_mode:
-            self.pool.close()
-            self.pool.join()
+            try:
+                self.pool.close()
+                self.pool.join()
+            except Exception as e:
+                log.warning('Can\'t close and join process pool.', exc_info=True)
 
     def _call_sync(self, tasks: Iterable) -> List:
         log.warning(f'Debug mode is turned on. All tasks will be run in the main process.')
