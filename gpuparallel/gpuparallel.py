@@ -38,7 +38,7 @@ def _run_task(func: Callable, task_idx, result_queue: Queue, ignore_errors=True)
 class GPUParallel:
     def __init__(self, device_ids: Optional[List[str]] = None, n_gpu: Optional[Union[int, str]] = None,
                  n_workers_per_gpu=1, init_fn: Optional[Callable] = None, preserve_order=True,
-                 progressbar=True, ignore_errors=False, debug=False):
+                 progressbar=True, pbar_description=None, ignore_errors=False, debug=False):
         """
         Parallel execution of functions passed to ``__call__``.
 
@@ -66,6 +66,7 @@ class GPUParallel:
         self.n_workers_per_gpu = n_workers_per_gpu
         self.preserve_order = preserve_order
         self.progressbar = progressbar
+        self.pbar_description = pbar_description
         self.ignore_errors = ignore_errors
         self.debug_mode = debug
 
@@ -130,7 +131,7 @@ class GPUParallel:
         # Wait for all tasks to be performed
         tqdm = import_tqdm(self.progressbar)
         if self.preserve_order:
-            with tqdm(total=n_tasks) as pbar:
+            with tqdm(total=n_tasks, desc=self.pbar_description) as pbar:
                 result_cache = {}
                 for return_task_idx in range(n_tasks):
                     while return_task_idx not in result_cache:
@@ -142,7 +143,7 @@ class GPUParallel:
                     yield result_cache[return_task_idx]
                     del result_cache[return_task_idx]
         else:
-            with tqdm(total=n_tasks) as pbar:
+            with tqdm(total=n_tasks, desc=self.pbar_description) as pbar:
                 for return_task_idx in range(n_tasks):
                     task_idx, result = self.result_queue.get()
                     yield result
