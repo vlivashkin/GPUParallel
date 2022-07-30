@@ -1,6 +1,6 @@
 import logging
 from functools import partial
-from multiprocessing import Pool, Manager, Queue
+from billiard import Pool, Manager, Queue
 from typing import List, Iterable, Optional, Callable, Union, Generator
 
 from gpuparallel.utils import log, import_tqdm, kill_child_processes
