@@ -25,14 +25,15 @@ def _run_task(func: Callable, task_idx, result_queue: Queue, ignore_errors=True)
 
     try:
         result = func(worker_id=worker_id, device_id=device_id)
-        result_queue.put((task_idx, result))
+        return result
     except Exception as e:
         log.error(f"Error during task #{task_idx}", exc_info=True)
         if ignore_errors:
             log.warning(f"Exception will be ignored according to ignore_errors flag")
-            result_queue.put((task_idx, None))  # __call__ expects to get number of results equal to number of tasks
         else:
             raise e
+    finally:
+        result_queue.put(task_idx)
 
 
 class GPUParallel:
@@ -134,8 +135,9 @@ class GPUParallel:
     def _call_async(self, tasks: Iterable) -> Generator:
         # Submit all tasks to pool
         n_tasks = 0
+        async_results = {}
         for task_idx, task in enumerate(tasks):
-            self.pool.apply_async(_run_task, (task, task_idx, self.result_queue, self.ignore_errors))
+            async_results[task_idx] = self.pool.apply_async(_run_task, (task, task_idx, self.result_queue, self.ignore_errors))
             n_tasks += 1
         log.debug(f"Submitted {n_tasks} tasks")
 
@@ -147,7 +149,8 @@ class GPUParallel:
                 for return_task_idx in range(n_tasks):
                     while return_task_idx not in result_cache:
                         log.debug(f"{return_task_idx} not in cached {list(result_cache.keys())}...")
-                        task_idx, result = self.result_queue.get()
+                        task_idx = self.result_queue.get()
+                        result = async_results[task_idx].get()
                         result_cache[task_idx] = result
                         pbar.update(1)
                     log.debug(f"Found {return_task_idx} in cache!")
@@ -155,8 +158,9 @@ class GPUParallel:
                     del result_cache[return_task_idx]
         else:
             with tqdm(total=n_tasks, desc=self.pbar_description) as pbar:
-                for return_task_idx in range(n_tasks):
-                    task_idx, result = self.result_queue.get()
+                for _ in range(n_tasks):
+                    task_idx = self.result_queue.get()
+                    result = async_results[task_idx].get()
                     yield result
                     pbar.update(1)
         log.debug("All results are received!")
