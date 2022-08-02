@@ -1,12 +1,12 @@
+import enum
 import logging
 from functools import partial
-from multiprocessing import Pool, Manager, Queue
 from typing import List, Iterable, Optional, Callable, Union, Generator
 
 from gpuparallel.utils import log, import_tqdm
 
 
-def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None):
+def _init_worker(gpu_queue, init_fn: Optional[Callable] = None):
     global worker_id, device_id
 
     worker_id, device_id = gpu_queue.get()
@@ -20,7 +20,7 @@ def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None):
     log.debug(f"Worker #{worker_id} with GPU{device_id} initialized.")
 
 
-def _run_task(func: Callable, task_idx, result_queue: Queue, ignore_errors=True):
+def _run_task(func: Callable, task_idx, result_queue, ignore_errors=True):
     global worker_id, device_id
 
     try:
@@ -34,6 +34,10 @@ def _run_task(func: Callable, task_idx, result_queue: Queue, ignore_errors=True)
         else:
             raise e
 
+class ConcurrencyBackend(enum.Enum):
+    MULTIPROCESSING = enum.auto()
+    BILLIARD = enum.auto()
+
 
 class GPUParallel:
     def __init__(
@@ -46,6 +50,7 @@ class GPUParallel:
         progressbar=True,
         pbar_description=None,
         ignore_errors=False,
+        concurrency_backend=ConcurrencyBackend.MULTIPROCESSING,
         debug=False,
     ):
         """
@@ -66,11 +71,19 @@ class GPUParallel:
         :param preserve_order: Return values with the same order as input.
         :param progressbar: Allow to use tqdm progressbar.
         :param ignore_errors: Either ignore errors inside tasks or raise them.
+        :param concurrency_backend: Concurrency library used for parallelism.
         :param debug: When this parameter is True, parameters n_gpu and device_ids are ignored.
             Class creates only one worker ([device_id='cuda:0']) and run it in the same process (for better debugging).
 
         """
         assert not (n_gpu is not None and device_ids is not None), "Both 'n_gpu' and 'device_ids' cannot de filled"
+
+        if concurrency_backend == ConcurrencyBackend.MULTIPROCESSING:
+            from multiprocessing import Pool, Manager, Queue
+        elif concurrency_backend == ConcurrencyBackend.BILLIARD:
+            from billiard import Pool, Manager, Queue
+        else:
+            raise RuntimeError(f"Unknown concurrency_backend - '{concurrency_backend}'.")
 
         self.n_workers_per_gpu = n_workers_per_gpu
         self.preserve_order = preserve_order
