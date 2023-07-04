@@ -36,11 +36,6 @@ def _run_task(func: Callable, task_idx, result_queue: Queue, ignore_errors=True)
 
 
 class GPUParallel:
-<<<<<<< HEAD
-    def __init__(self, device_ids: Optional[List[str]] = None, n_gpu: Optional[Union[int, str]] = None,
-                 n_workers_per_gpu=1, init_fn: Optional[Callable] = None, preserve_order=True,
-                 progressbar=True, pbar_description=None, ignore_errors=False, kill_all_children_on_exit=True, debug=False):
-=======
     def __init__(
         self,
         device_ids: Optional[List[str]] = None,
@@ -51,9 +46,9 @@ class GPUParallel:
         progressbar=True,
         pbar_description=None,
         ignore_errors=False,
+        kill_all_children_on_exit=True,
         debug=False,
     ):
->>>>>>> b7370a8 (black formatter)
         """
         Parallel execution of functions passed to ``__call__``.
 
