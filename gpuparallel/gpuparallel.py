@@ -93,8 +93,8 @@ class GPUParallel:
             self.device_ids = [f"cuda:{idx}" for idx in range(n_gpu)]
 
         if not self.debug_mode:
-            m = Manager()
-            self.gpu_queue = m.Queue()
+            self._manager = Manager()
+            self.gpu_queue = self._manager.Queue()
             for device_idx in range(self.n_gpu):
                 for idx in range(self.n_workers_per_gpu):
                     worker_id = device_idx * self.n_workers_per_gpu + idx
@@ -105,7 +105,7 @@ class GPUParallel:
                 processes=self.n_gpu * self.n_workers_per_gpu, initializer=initializer, maxtasksperchild=None
             )
 
-            self.result_queue = m.Queue()
+            self.result_queue = self._manager.Queue()
         else:  # debug mode; run init in the same process
             log.warning("Debug mode. All tasks will be run in main process for debug purposes.")
             if init_fn is not None:
@@ -118,6 +118,7 @@ class GPUParallel:
         """
         if not self.debug_mode:
             try:
+                self._manager.shutdown()
                 self.pool.close()
                 self.pool.join()
             except Exception as e:
@@ -163,7 +164,7 @@ class GPUParallel:
                     del result_cache[return_task_idx]
         else:
             with tqdm(total=n_tasks, desc=self.pbar_description) as pbar:
-                for return_task_idx in range(n_tasks):
+                for _ in range(n_tasks):
                     task_idx, result = self.result_queue.get()
                     yield result
                     pbar.update(1)
