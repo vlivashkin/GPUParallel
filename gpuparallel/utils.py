@@ -62,8 +62,3 @@ def import_tqdm(progressbar=True):
         except ImportError:
             log.warning("Can't load tqdm")
     return TqdmStub
-
-def kill_child_processes():
-    parent = psutil.Process(os.getpid())
-    for child in parent.children(recursive=True):
-        child.kill()

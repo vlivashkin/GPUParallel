@@ -1,9 +1,9 @@
 import logging
 from functools import partial
-from billiard import Pool, Manager, Queue
+from billiard import Pool, Manager, Queue, active_children
 from typing import List, Iterable, Optional, Callable, Union, Generator
 
-from gpuparallel.utils import log, import_tqdm, kill_child_processes
+from gpuparallel.utils import log, import_tqdm
 
 
 def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None):
@@ -124,10 +124,9 @@ class GPUParallel:
             except Exception as e:
                 log.warning("Can't close and join process pool.", exc_info=True)
 
-        if self.kill_all_children_on_exit:
-            log.info("Kill all children of the current process to prevent hangs in the next run")
-            kill_child_processes()
-            log.info("All children killed")
+        children = active_children()
+        if children:
+            log.warning(f"{len(children)} child processes are still alive after closing the pool.")
 
     def _call_sync(self, tasks: Iterable) -> List:
         log.warning(f"Debug mode is turned on. All tasks will be run in the main process.")
