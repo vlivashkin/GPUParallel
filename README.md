@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.com/vlivashkin/GPUParallel.svg?branch=main)](https://travis-ci.com/vlivashkin/gpuparallel)
 [![codecov](https://codecov.io/gh/vlivashkin/GPUParallel/branch/main/graph/badge.svg?token=eo2uyiDmj1)](https://codecov.io/gh/vlivashkin/GPUParallel)
 [![Documentation Status](https://readthedocs.org/projects/gpuparallel/badge/?version=latest)](https://gpuparallel.readthedocs.io/en/latest/?badge=latest)
-[![pypi](https://pypip.in/v/gpuparallel/badge.svg)](https://pypi.python.org/pypi/gpuparallel/)
+[![PyPI version](https://badge.fury.io/py/gpuparallel.svg)](https://badge.fury.io/py/gpuparallel)
 # GPUParallel
 Joblib-like interface for parallel GPU computations (e.g. data preprocessing).
 
