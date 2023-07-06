@@ -1,6 +1,6 @@
 import logging
 from functools import partial
-from multiprocessing import Pool, Manager, Queue
+from multiprocessing import Pool, Manager, Queue, active_children
 from typing import List, Iterable, Optional, Callable, Union, Generator
 
 from gpuparallel.utils import log, import_tqdm
@@ -90,8 +90,8 @@ class GPUParallel:
             self.device_ids = [f"cuda:{idx}" for idx in range(n_gpu)]
 
         if not self.debug_mode:
-            m = Manager()
-            self.gpu_queue = m.Queue()
+            self._manager = Manager()
+            self.gpu_queue = self._manager.Queue()
             for device_idx in range(self.n_gpu):
                 for idx in range(self.n_workers_per_gpu):
                     worker_id = device_idx * self.n_workers_per_gpu + idx
@@ -102,7 +102,7 @@ class GPUParallel:
                 processes=self.n_gpu * self.n_workers_per_gpu, initializer=initializer, maxtasksperchild=None
             )
 
-            self.result_queue = m.Queue()
+            self.result_queue = self._manager.Queue()
         else:  # debug mode; run init in the same process
             log.warning("Debug mode. All tasks will be run in main process for debug purposes.")
             if init_fn is not None:
@@ -115,10 +115,15 @@ class GPUParallel:
         """
         if not self.debug_mode:
             try:
+                self._manager.shutdown()
                 self.pool.close()
                 self.pool.join()
             except Exception as e:
                 log.warning("Can't close and join process pool.", exc_info=True)
+
+        children = active_children()
+        if children:
+            log.warning(f"{len(children)} child processes are still alive after closing the pool.")
 
     def _call_sync(self, tasks: Iterable) -> List:
         log.warning(f"Debug mode is turned on. All tasks will be run in the main process.")
