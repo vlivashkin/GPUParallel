@@ -121,7 +121,9 @@ class GPUParallel:
                 self._manager.shutdown()
                 self.pool.close()
                 self.pool.join()
-            except Exception as e:
+                if self.kill_all_children_on_exit:
+                    kill_child_processes()
+            except Exception:
                 log.warning("Can't close and join process pool.", exc_info=True)
 
         children = active_children()
