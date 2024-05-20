@@ -1,4 +1,7 @@
 import multiprocessing as mp
+import os
+import signal
+import subprocess
 from functools import partial
 
 log = mp.get_logger()
@@ -57,3 +60,11 @@ def import_tqdm(progressbar=True):
         except ImportError:
             log.warning("Can't load tqdm")
     return TqdmStub
+
+def kill_child_processes():
+    parent_id = os.getpid()
+    ps_command = subprocess.Popen("ps -o pid --ppid %d --noheaders" % parent_id, shell=True, stdout=subprocess.PIPE)
+    ps_output = ps_command.stdout.read()
+    retcode = ps_command.wait()
+    for pid_str in ps_output.strip().split("\n")[:-1]:
+        os.kill(int(pid_str), signal.SIGTERM)

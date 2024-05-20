@@ -3,7 +3,7 @@ from functools import partial
 from multiprocessing import Pool, Manager, Queue
 from typing import List, Iterable, Optional, Callable, Union, Generator
 
-from gpuparallel.utils import log, import_tqdm
+from gpuparallel.utils import log, import_tqdm, kill_child_processes
 
 
 def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None):
@@ -38,7 +38,7 @@ def _run_task(func: Callable, task_idx, result_queue: Queue, ignore_errors=True)
 class GPUParallel:
     def __init__(self, device_ids: Optional[List[str]] = None, n_gpu: Optional[Union[int, str]] = None,
                  n_workers_per_gpu=1, init_fn: Optional[Callable] = None, preserve_order=True,
-                 progressbar=True, ignore_errors=False, debug=False):
+                 progressbar=True, ignore_errors=False, kill_all_children_on_exit=True, debug=False):
         """
         Parallel execution of functions passed to ``__call__``.
 
@@ -57,6 +57,7 @@ class GPUParallel:
         :param preserve_order: Return values with the same order as input.
         :param progressbar: Allow to use tqdm progressbar.
         :param ignore_errors: Either ignore errors inside tasks or raise them.
+        :param kill_all_children_on_exit: Kill all children of the current process to prevent hangs in the next run.
         :param debug: When this parameter is True, parameters n_gpu and device_ids are ignored.
             Class creates only one worker ([device_id='cuda:0']) and run it in the same process (for better debugging).
 
@@ -67,6 +68,7 @@ class GPUParallel:
         self.preserve_order = preserve_order
         self.progressbar = progressbar
         self.ignore_errors = ignore_errors
+        self.kill_all_children_on_exit = kill_all_children_on_exit
         self.debug_mode = debug
 
         if device_ids is not None:
@@ -108,6 +110,11 @@ class GPUParallel:
                 self.pool.join()
             except Exception as e:
                 log.warning('Can\'t close and join process pool.', exc_info=True)
+
+        if self.kill_all_children_on_exit:
+            log.info("Kill all children of the current process to prevent hangs in the next run")
+            kill_child_processes()
+            log.info("All children killed")
 
     def _call_sync(self, tasks: Iterable) -> List:
         log.warning(f'Debug mode is turned on. All tasks will be run in the main process.')
