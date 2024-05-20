@@ -1,7 +1,8 @@
+[![Build Status](https://travis-ci.com/vlivashkin/gpuparallel.svg?branch=master)](https://travis-ci.com/vlivashkin/gpuparallel)
+[![Documentation Status](https://readthedocs.org/projects/gpuparallel/badge/?version=latest)](https://gpuparallel.readthedocs.io/en/latest/?badge=latest)
 # GPUParallel
 Joblib-like interface for parallel GPU computations (e.g. data preprocessing).
 
-[![Documentation Status](https://readthedocs.org/projects/gpuparallel/badge/?version=latest)](https://gpuparallel.readthedocs.io/en/latest/?badge=latest)
 
 ## Install
 ```bash
