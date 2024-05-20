@@ -1,10 +1,21 @@
-import multiprocessing
+import multiprocessing as mp
 import traceback
 from functools import partial
 from multiprocessing import Pool, Manager, Queue
 from typing import List, Iterable, Optional, Callable
 
 from tqdm import tqdm
+
+
+def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None, verbose=True):
+    global worker_id, gpu_id
+
+    worker_id, gpu_id = gpu_queue.get()
+    if init_fn is not None:
+        init_fn(worker_id=worker_id, gpu_id=gpu_id)
+
+    if verbose:
+        mp.get_logger().info(f'Worker #{worker_id} with GPU{gpu_id} initialized.')
 
 
 def _run_task(func: Callable, result_queue: Queue, ignore_errors=True):
@@ -14,7 +25,7 @@ def _run_task(func: Callable, result_queue: Queue, ignore_errors=True):
         result = func(worker_id=worker_id, gpu_id=gpu_id)
         result_queue.put(result)
     except Exception as e:
-        multiprocessing.get_logger().error(traceback.format_exc())
+        mp.get_logger().error(traceback.format_exc())
         result_queue.put(None)  # __call__ expects to get number of results equal to number of tasks
         if not ignore_errors:
             raise
@@ -49,10 +60,11 @@ class GPUParallel:
                 self.gpu_queue.put((worker_id, gpu_id))
 
         if self.verbose:
-            multiprocessing.log_to_stderr()
+            mp.log_to_stderr()
+            mp.get_logger().setLevel('INFO')
 
-        self.pool = Pool(processes=self.n_gpu * self.n_workers_per_gpu,
-                         initializer=partial(self._init_worker, init_fn=init_fn),
+        initializer = partial(_init_worker, gpu_queue=self.gpu_queue, init_fn=init_fn, verbose=self.verbose)
+        self.pool = Pool(processes=self.n_gpu * self.n_workers_per_gpu, initializer=initializer,
                          maxtasksperchild=None)
 
         self.result_queue = m.Queue()
@@ -64,16 +76,6 @@ class GPUParallel:
         """
         self.pool.close()
         self.pool.join()
-
-    def _init_worker(self, init_fn: Optional[Callable] = None):
-        global worker_id, gpu_id
-
-        worker_id, gpu_id = self.gpu_queue.get()
-        if init_fn is not None:
-            init_fn(worker_id=worker_id, gpu_id=gpu_id)
-
-        if self.verbose:
-            print(f'Worker #{worker_id} with GPU{gpu_id} initialized.')
 
     def __call__(self, tasks: Iterable) -> List:
         """
