@@ -14,10 +14,10 @@ def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None):
         init_fn(worker_id=worker_id, device_id=device_id)
 
     if len(log.handlers) > 0:
-        fmt = logging.Formatter(f'[%(levelname)s/Worker-{worker_id}({device_id})]:%(message)s')
+        fmt = logging.Formatter(f"[%(levelname)s/Worker-{worker_id}({device_id})]:%(message)s")
         log.handlers[0].setFormatter(fmt)
 
-    log.debug(f'Worker #{worker_id} with GPU{device_id} initialized.')
+    log.debug(f"Worker #{worker_id} with GPU{device_id} initialized.")
 
 
 def _run_task(func: Callable, task_idx, result_queue: Queue, ignore_errors=True):
@@ -27,18 +27,27 @@ def _run_task(func: Callable, task_idx, result_queue: Queue, ignore_errors=True)
         result = func(worker_id=worker_id, device_id=device_id)
         result_queue.put((task_idx, result))
     except Exception as e:
-        log.error(f'Error during task #{task_idx}', exc_info=True)
+        log.error(f"Error during task #{task_idx}", exc_info=True)
         if ignore_errors:
-            log.warning(f'Exception will be ignored according to ignore_errors flag')
+            log.warning(f"Exception will be ignored according to ignore_errors flag")
             result_queue.put((task_idx, None))  # __call__ expects to get number of results equal to number of tasks
         else:
             raise e
 
 
 class GPUParallel:
-    def __init__(self, device_ids: Optional[List[str]] = None, n_gpu: Optional[Union[int, str]] = None,
-                 n_workers_per_gpu=1, init_fn: Optional[Callable] = None, preserve_order=True,
-                 progressbar=True, pbar_description=None, ignore_errors=False, debug=False):
+    def __init__(
+        self,
+        device_ids: Optional[List[str]] = None,
+        n_gpu: Optional[Union[int, str]] = None,
+        n_workers_per_gpu=1,
+        init_fn: Optional[Callable] = None,
+        preserve_order=True,
+        progressbar=True,
+        pbar_description=None,
+        ignore_errors=False,
+        debug=False,
+    ):
         """
         Parallel execution of functions passed to ``__call__``.
 
@@ -71,14 +80,14 @@ class GPUParallel:
         self.debug_mode = debug
 
         if device_ids is not None:
-            assert len(device_ids) > 0, 'len(device_ids) must be > 0'
+            assert len(device_ids) > 0, "len(device_ids) must be > 0"
             self.n_gpu = len(device_ids)
             self.device_ids = device_ids
         else:
             n_gpu = n_gpu if n_gpu is not None else 1
-            assert n_gpu > 0, 'n_gpu must be > 0'
+            assert n_gpu > 0, "n_gpu must be > 0"
             self.n_gpu = n_gpu
-            self.device_ids = [f'cuda:{idx}' for idx in range(n_gpu)]
+            self.device_ids = [f"cuda:{idx}" for idx in range(n_gpu)]
 
         if not self.debug_mode:
             m = Manager()
@@ -89,12 +98,13 @@ class GPUParallel:
                     self.gpu_queue.put((worker_id, self.device_ids[device_idx]))
 
             initializer = partial(_init_worker, gpu_queue=self.gpu_queue, init_fn=init_fn)
-            self.pool = Pool(processes=self.n_gpu * self.n_workers_per_gpu, initializer=initializer,
-                             maxtasksperchild=None)
+            self.pool = Pool(
+                processes=self.n_gpu * self.n_workers_per_gpu, initializer=initializer, maxtasksperchild=None
+            )
 
             self.result_queue = m.Queue()
         else:  # debug mode; run init in the same process
-            log.warning('Debug mode. All tasks will be run in main process for debug purposes.')
+            log.warning("Debug mode. All tasks will be run in main process for debug purposes.")
             if init_fn is not None:
                 init_fn(worker_id=0, device_id=self.device_ids[0])
 
@@ -108,14 +118,15 @@ class GPUParallel:
                 self.pool.close()
                 self.pool.join()
             except Exception as e:
-                log.warning('Can\'t close and join process pool.', exc_info=True)
+                log.warning("Can't close and join process pool.", exc_info=True)
 
     def _call_sync(self, tasks: Iterable) -> List:
-        log.warning(f'Debug mode is turned on. All tasks will be run in the main process.')
+        log.warning(f"Debug mode is turned on. All tasks will be run in the main process.")
 
         tasks = list(tasks)
         if self.progressbar:
             from tqdm.auto import tqdm
+
             tasks = tqdm(tasks)
         for task in tasks:
             yield task(worker_id=0, device_id=self.device_ids[0])
@@ -126,7 +137,7 @@ class GPUParallel:
         for task_idx, task in enumerate(tasks):
             self.pool.apply_async(_run_task, (task, task_idx, self.result_queue, self.ignore_errors))
             n_tasks += 1
-        log.debug(f'Submitted {n_tasks} tasks')
+        log.debug(f"Submitted {n_tasks} tasks")
 
         # Wait for all tasks to be performed
         tqdm = import_tqdm(self.progressbar)
@@ -135,11 +146,11 @@ class GPUParallel:
                 result_cache = {}
                 for return_task_idx in range(n_tasks):
                     while return_task_idx not in result_cache:
-                        log.debug(f'{return_task_idx} not in cached {list(result_cache.keys())}...')
+                        log.debug(f"{return_task_idx} not in cached {list(result_cache.keys())}...")
                         task_idx, result = self.result_queue.get()
                         result_cache[task_idx] = result
                         pbar.update(1)
-                    log.debug(f'Found {return_task_idx} in cache!')
+                    log.debug(f"Found {return_task_idx} in cache!")
                     yield result_cache[return_task_idx]
                     del result_cache[return_task_idx]
         else:
@@ -148,7 +159,7 @@ class GPUParallel:
                     task_idx, result = self.result_queue.get()
                     yield result
                     pbar.update(1)
-        log.debug('All results are received!')
+        log.debug("All results are received!")
 
     def __call__(self, tasks: Iterable[Callable]) -> Generator:
         """
