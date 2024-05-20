@@ -63,6 +63,20 @@ for folder_images in folders:
 del gp  # this will close process pool to free memory
 ```
 
+### Return a generator to not keep all the results in memory
+
+```python
+import h5py
+
+gp = GPUParallel(n_gpu=16, n_workers_per_gpu=2, return_generator=True)
+
+with h5py.File('output.h5') as f:
+    result_dataset = f.create_dataset('result', shape=(300, 224, 224, 3))
+    generator = gp(delayed(perform)(img) for img in images)
+    for idx, result in enumerate(generator):
+        result_dataset[idx] = result
+```
+
 ### Simple logging from workers
 `print()` inside a worker won't be seen in the main process, but you still can use logging to stderr of the main process.
 Use `log_to_stderr()` call to init logging, and `log.info(message)` to log info from workers
