@@ -28,3 +28,32 @@ def delayed(func):
         return partial(func, *args, **kwargs)
 
     return wrapper
+
+
+class TqdmStub:
+    """
+    Stub for the case if tqdm is disabled.
+    """
+
+    def __init__(self, total=None, *args, **kwargs):
+        self.total = total
+
+    def __enter__(self):
+        self.current = 0
+        return self
+
+    def update(self, increment):
+        self.current += increment
+
+    def __exit__(self, type, value, traceback):
+        pass
+
+
+def import_tqdm(progressbar=True):
+    if progressbar:
+        try:
+            from tqdm.auto import tqdm
+            return tqdm
+        except ImportError:
+            log.warning("Can't load tqdm")
+    return TqdmStub
