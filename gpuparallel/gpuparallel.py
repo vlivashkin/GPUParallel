@@ -21,23 +21,23 @@ def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None):
     log.debug(f'Worker #{worker_id} with GPU{device_id} initialized.')
 
 
-def _run_task(func: Callable, result_queue: Queue, ignore_errors=True):
+def _run_task(func: Callable, task_idx, result_queue: Queue, ignore_errors=True):
     global worker_id, device_id
 
     try:
         result = func(worker_id=worker_id, device_id=device_id)
-        result_queue.put(result)
+        result_queue.put((task_idx, result))
     except Exception as e:
         log.error(traceback.format_exc())
-        result_queue.put(None)  # __call__ expects to get number of results equal to number of tasks
+        result_queue.put((task_idx, None))  # __call__ expects to get number of results equal to number of tasks
         if not ignore_errors:
-            raise
+            raise e
 
 
 class GPUParallel:
     def __init__(self, device_ids: Optional[List[str]] = None, n_gpu: Optional[Union[int, str]] = None,
-                 n_workers_per_gpu=1, init_fn: Optional[Callable] = None, return_generator=False, progressbar=True,
-                 ignore_errors=True, debug=False):
+                 n_workers_per_gpu=1, init_fn: Optional[Callable] = None, preserve_order=True, return_generator=False,
+                 progressbar=True, ignore_errors=True, debug=False):
         """
         Parallel execution of functions passed to ``__call__``.
 
@@ -53,6 +53,7 @@ class GPUParallel:
             Function which will be called during worker init.
             Function must have parameters ``worker_id`` and ``device_id`` (or ``**kwargs``).
             Helpful to init all common stuff (e.g. neural networks) here.
+        :param preserve_order: Return values with the same order as input.
         :param progressbar: Allow to use tqdm progressbar.
         :param ignore_errors: Either ignore errors inside tasks or raise them.
         :param debug: When this parameter is True, parameters n_gpu and device_ids are ignored.
@@ -63,6 +64,7 @@ class GPUParallel:
 
         self.n_workers_per_gpu = n_workers_per_gpu
         self.return_generator = return_generator
+        self.preserve_order = preserve_order
         self.progressbar = progressbar
         self.ignore_errors = ignore_errors
         self.debug_mode = debug
@@ -116,20 +118,40 @@ class GPUParallel:
 
     def _call_async(self, tasks: Iterable) -> Iterable:
         n_tasks = 0
-        for task in tasks:
-            self.pool.apply_async(_run_task, (task, self.result_queue, self.ignore_errors))
+        for task_idx, task in enumerate(tasks):
+            self.pool.apply_async(_run_task, (task, task_idx, self.result_queue, self.ignore_errors))
             n_tasks += 1
         log.debug(f'Submitted {n_tasks} tasks')
 
+        result_cache = {}
         if self.progressbar:
             from tqdm.auto import tqdm
             with tqdm(total=n_tasks) as pbar:
-                for idx in range(n_tasks):
-                    yield self.result_queue.get()
-                    pbar.update(1)
+                for return_task_idx in range(n_tasks):
+                    if self.preserve_order:
+                        while return_task_idx not in result_cache:
+                            log.debug(f'{return_task_idx} not in cached {list(result_cache.keys())}...')
+                            task_idx, result = self.result_queue.get()
+                            result_cache[task_idx] = result
+                            pbar.update(1)
+                        log.debug(f'Found {return_task_idx} in cache!')
+                        yield result_cache[return_task_idx]
+                        del result_cache[return_task_idx]
+                    else:
+                        yield self.result_queue.get()[1]
+                        pbar.update(1)
         else:
-            for _ in range(n_tasks):
-                yield self.result_queue.get()
+            for return_task_idx in range(n_tasks):
+                if self.preserve_order:
+                    while return_task_idx not in result_cache:
+                        log.debug(f'{return_task_idx} not in cached {list(result_cache.keys())}...')
+                        task_idx, result = self.result_queue.get()
+                        result_cache[task_idx] = result
+                    log.debug(f'Found {return_task_idx} in cache!')
+                    yield result_cache[return_task_idx]
+                    del result_cache[return_task_idx]
+                else:
+                    yield self.result_queue.get()[1]
 
         log.debug('All results are received!')
 
