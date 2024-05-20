@@ -102,13 +102,13 @@ from gpuparallel import GPUParallel, delayed, log_to_stderr, log
 log_to_stderr('INFO')
 
 def perform(idx, worker_id=None, device_id=None):
-    hi = f'Hello world #{idx} from worker #{worker_id} with GPU#{gpu_id}!'
+    hi = f'Hello world #{idx} from worker #{worker_id} with {device_id}!'
     log.info(hi)
 
 GPUParallel(n_gpu=2)(delayed(perform)(idx) for idx in range(2))
 ```
 It will return:
 ```
-[INFO/Worker-1(GPU1)]:Hello world #1 from worker #1 with GPU#1!
-[INFO/Worker-0(GPU0)]:Hello world #0 from worker #0 with GPU#0!
+[INFO/Worker-1(cuda:1)]:Hello world #1 from worker #1 with cuda:1!
+[INFO/Worker-0(cuda:0)]:Hello world #0 from worker #0 with cuda:0!
 ```
