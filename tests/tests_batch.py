@@ -1,5 +1,5 @@
 import unittest
-
+import numpy as np
 from gpuparallel import GPUParallel, BatchGPUParallel, delayed, log_to_stderr
 
 log_to_stderr(log_level='INFO')
@@ -32,16 +32,16 @@ class TestBatchGPUParallel(unittest.TestCase):
 
         bgpup = BatchGPUParallel(task_fn=task_return_identity, batch_size=3, flat_result=True,
                                  n_gpu=2, progressbar=False)
-        batched_results = list(bgpup(true_seq))
-        self.assertEqual(true_seq, batched_results)
+        flat_results = list(bgpup(true_seq))
+        self.assertEqual(true_seq, flat_results)
 
     def test_kwargs_flat_result(self):
         true_seq = list(range(10))
 
         bgpup = BatchGPUParallel(task_fn=task_return_identity, batch_size=3, flat_result=True,
                                  n_gpu=2, progressbar=False)
-        batched_results = list(bgpup(value=true_seq))
-        self.assertEqual(true_seq, batched_results)
+        flat_results = list(bgpup(value=true_seq))
+        self.assertEqual(true_seq, flat_results)
 
     def test_nonbatched_args(self):
         true_seq = list(range(10))
@@ -59,3 +59,16 @@ class TestBatchGPUParallel(unittest.TestCase):
                                  n_gpu=1, progressbar=False)
         batched_results = list(bgpup(true_seq, batched_value=true_seq, nonbatched_sequence='test', nonbatched_value=3))
         self.assertEqual(true_first_batch, batched_results[0])
+
+    def test_input_generator(self):
+        bgpup = BatchGPUParallel(task_fn=task_return_identity, batch_size=3, flat_result=True,
+                                 n_gpu=2, progressbar=False)
+        flat_results = list(bgpup(range(100)))
+        self.assertEqual(list(range(100)), flat_results)
+
+    def test_numpy(self):
+        arr = np.zeros((102, 103))
+        bgpup = BatchGPUParallel(task_fn=task_return_identity, batch_size=3, flat_result=True,
+                                 n_gpu=2, progressbar=False)
+        flat_results = np.array(list(bgpup(arr)))
+        self.assertEqual(arr.shape, flat_results.shape)
