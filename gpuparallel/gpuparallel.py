@@ -46,6 +46,7 @@ class GPUParallel:
         progressbar=True,
         pbar_description=None,
         ignore_errors=False,
+        kill_all_children_on_exit=True,
         debug=False,
     ):
         """
