@@ -13,8 +13,8 @@ setup(
     author_email="illusionww@gmail.com",
     license="MIT",
     packages=["gpuparallel"],
-    install_requires=[
-        "tqdm",
-        "billiard>=3.6.3.0,<4.0",
-    ],
+    install_requires=["tqdm", "psutil"],
+    extras_require={
+        "billiard": ["billiard>=3.6.3.0,<4.0"],
+    },
 )

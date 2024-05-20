@@ -1,37 +1,9 @@
-import logging
 from functools import partial
 from typing import List, Iterable, Optional, Callable, Union, Generator
 
+from gpuparallel.exceptions import GPUPPoolException, GPUPWorkerException, GPUPWorkerNotInitializedException
 from gpuparallel.utils import log, import_tqdm, kill_child_processes
-
-
-def _init_worker(gpu_queue: "Queue", init_fn: Optional[Callable] = None):
-    global worker_id, device_id
-
-    worker_id, device_id = gpu_queue.get()
-    if init_fn is not None:
-        init_fn(worker_id=worker_id, device_id=device_id)
-
-    if len(log.handlers) > 0:
-        fmt = logging.Formatter(f"[%(levelname)s/Worker-{worker_id}({device_id})]:%(message)s")
-        log.handlers[0].setFormatter(fmt)
-
-    log.debug(f"Worker #{worker_id} with GPU{device_id} initialized.")
-
-
-def _run_task(func: Callable, task_idx, result_queue: "Queue", ignore_errors=True):
-    global worker_id, device_id
-
-    try:
-        result = func(worker_id=worker_id, device_id=device_id)
-        result_queue.put((task_idx, result))
-    except Exception as e:
-        log.error(f"Error during task #{task_idx}", exc_info=True)
-        if ignore_errors:
-            log.warning(f"Exception will be ignored according to ignore_errors flag")
-            result_queue.put((task_idx, None))  # __call__ expects to get number of results equal to number of tasks
-        else:
-            raise e
+from gpuparallel.worker import _init_worker, _run_task
 
 
 class GPUParallel:
@@ -41,7 +13,7 @@ class GPUParallel:
         n_gpu: Optional[Union[int, str]] = None,
         n_workers_per_gpu=1,
         init_fn: Optional[Callable] = None,
-        preserve_order=True,
+        preserve_order=False,
         progressbar=True,
         pbar_description=None,
         ignore_errors=False,
@@ -72,7 +44,7 @@ class GPUParallel:
             Class creates only one worker ([device_id='cuda:0']) and run it in the same process (for better debugging).
 
         """
-        assert not (n_gpu is not None and device_ids is not None), "Both 'n_gpu' and 'device_ids' cannot de filled"
+        assert not (n_gpu is not None and device_ids is not None), "Fill either 'n_gpu' or 'device_ids'"
 
         self.n_workers_per_gpu = n_workers_per_gpu
         self.preserve_order = preserve_order
@@ -83,13 +55,6 @@ class GPUParallel:
         self.engine = engine
         self.debug_mode = debug
 
-        if self.engine == "multiprocessing":
-            from multiprocessing import Pool, Manager
-        elif self.engine == "billiard":
-            from billiard import Pool, Manager
-        else:
-            raise NotImplementedError(self.engine)
-
         if device_ids is not None:
             assert len(device_ids) > 0, "len(device_ids) must be > 0"
             self.n_gpu = len(device_ids)
@@ -99,6 +64,13 @@ class GPUParallel:
             assert n_gpu > 0, "n_gpu must be > 0"
             self.n_gpu = n_gpu
             self.device_ids = [f"cuda:{idx}" for idx in range(n_gpu)]
+
+        if self.engine == "multiprocessing":
+            from multiprocessing import Pool, Manager
+        elif self.engine == "billiard":
+            from billiard import Pool, Manager
+        else:
+            raise NotImplementedError(self.engine)
 
         if not self.debug_mode:
             self._manager = Manager()
@@ -156,11 +128,23 @@ class GPUParallel:
         for task in tasks:
             yield task(worker_id=0, device_id=self.device_ids[0])
 
+    def wrap_worker_exception(self, result):
+        if isinstance(result, GPUPWorkerNotInitializedException):
+            raise GPUPPoolException(result)
+        if isinstance(result, GPUPWorkerException):
+            log.warning(f"Exception in Worker-{result.worker_id}({result.device_id}): {result}")
+            if self.ignore_errors:
+                log.warning("ignore_errors=True, fill the result with None")
+                result = None
+            else:
+                raise GPUPPoolException(result)
+        return result
+
     def _call_async(self, tasks: Iterable) -> Generator:
         # Submit all tasks to pool
         n_tasks = 0
         for task_idx, task in enumerate(tasks):
-            self.pool.apply_async(_run_task, (task, task_idx, self.result_queue, self.ignore_errors))
+            self.pool.apply_async(_run_task, (task, task_idx, self.result_queue))
             n_tasks += 1
         log.debug(f"Submitted {n_tasks} tasks")
 
@@ -173,7 +157,7 @@ class GPUParallel:
                     while return_task_idx not in result_cache:
                         log.debug(f"{return_task_idx} not in cached {list(result_cache.keys())}...")
                         task_idx, result = self.result_queue.get()
-                        result_cache[task_idx] = result
+                        result_cache[task_idx] = self.wrap_worker_exception(result)
                         pbar.update(1)
                     log.debug(f"Found {return_task_idx} in cache!")
                     yield result_cache[return_task_idx]
@@ -182,7 +166,7 @@ class GPUParallel:
             with tqdm(total=n_tasks, desc=self.pbar_description) as pbar:
                 for _ in range(n_tasks):
                     task_idx, result = self.result_queue.get()
-                    yield result
+                    yield self.wrap_worker_exception(result)
                     pbar.update(1)
         log.debug("All results are received!")
 

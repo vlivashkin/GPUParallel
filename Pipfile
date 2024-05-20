@@ -11,6 +11,8 @@ psutil = "*"
 [dev-packages]
 black = "*"
 numpy = "*"
+pytest = "*"
+pytest-codecov = "*"
 
 [requires]
 python_version = "3.12"

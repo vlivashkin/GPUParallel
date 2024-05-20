@@ -1,6 +1,6 @@
 import math
 import multiprocessing as mp
-from typing import Generator, Callable, Sequence
+from typing import Generator, Callable
 
 from .gpuparallel import GPUParallel
 from .utils import delayed
@@ -18,7 +18,7 @@ class BatchGPUParallel(GPUParallel):
         :param batch_size: Batch size
         :param flat_result: Unbatch results. Works only for single tensor output.
         """
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, preserve_order=True, **kwargs)
 
         self.task_fn = task_fn
         self.batch_size = batch_size
@@ -48,14 +48,14 @@ class BatchGPUParallel(GPUParallel):
         batches = []
         for batch_idx in range(n_batches):
             slce = slice(batch_idx * self.batch_size, (batch_idx + 1) * self.batch_size)
-            batch_args_kwargs = ([], {})
+            batch_args, batch_kwargs = [], {}
             for arg_idx, arg in enumerate(args):
                 batch_arg = arg[slce] if arg_idx in will_be_batched_args else arg
-                batch_args_kwargs[0].append(batch_arg)
+                batch_args.append(batch_arg)
             for kwarg_key, kwarg_value in kwargs.items():
                 batch_kwarg = kwarg_value[slce] if kwarg_key in will_be_batched_kwargs else kwarg_value
-                batch_args_kwargs[1][kwarg_key] = batch_kwarg
-            batches.append(delayed(self.task_fn)(*batch_args_kwargs[0], **batch_args_kwargs[1]))
+                batch_kwargs[kwarg_key] = batch_kwarg
+            batches.append(delayed(self.task_fn)(*batch_args, **batch_kwargs))
 
         result = super().__call__(batches)
         for batch in result:

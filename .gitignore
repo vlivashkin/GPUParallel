@@ -11,3 +11,4 @@ __pycache__/
 /gpuparallel.egg-info
 
 /tests/examples.py
+/.coverage

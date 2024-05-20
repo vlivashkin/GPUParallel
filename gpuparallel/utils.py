@@ -22,7 +22,7 @@ def log_to_stderr(log_level="INFO", force=False):
 def delayed(func):
     """
     Decorator used to capture the arguments of a function.
-    Analogue of joblib's delayed.
+    The analog function of `joblib.delayed`.
 
     :param func: Function to be captured.
     """

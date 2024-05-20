@@ -2,6 +2,6 @@
 set -ex
 
 SCRIPT_PATH=$(dirname "$(readlink -f "$0")")
-cd $SCRIPT_PATH
+cd $SCRIPT_PATH/..
 
-black --line-length 120 .
+python3 -m pytest tests
