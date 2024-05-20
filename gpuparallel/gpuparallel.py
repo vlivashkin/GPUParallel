@@ -1,10 +1,9 @@
 import logging
-import traceback
 from functools import partial
 from multiprocessing import Pool, Manager, Queue
 from typing import List, Iterable, Optional, Callable, Union, Generator
 
-from .utils import log
+from gpuparallel.utils import log, import_tqdm
 
 
 def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None):
@@ -39,7 +38,7 @@ def _run_task(func: Callable, task_idx, result_queue: Queue, ignore_errors=True)
 class GPUParallel:
     def __init__(self, device_ids: Optional[List[str]] = None, n_gpu: Optional[Union[int, str]] = None,
                  n_workers_per_gpu=1, init_fn: Optional[Callable] = None, preserve_order=True,
-                 progressbar=True, ignore_errors=True, debug=False):
+                 progressbar=True, ignore_errors=False, debug=False):
         """
         Parallel execution of functions passed to ``__call__``.
 
@@ -121,42 +120,33 @@ class GPUParallel:
             yield task(worker_id=0, device_id=self.device_ids[0])
 
     def _call_async(self, tasks: Iterable) -> Generator:
+        # Submit all tasks to pool
         n_tasks = 0
         for task_idx, task in enumerate(tasks):
             self.pool.apply_async(_run_task, (task, task_idx, self.result_queue, self.ignore_errors))
             n_tasks += 1
         log.debug(f'Submitted {n_tasks} tasks')
 
-        result_cache = {}
-        if self.progressbar:
-            from tqdm.auto import tqdm
+        # Wait for all tasks to be performed
+        tqdm = import_tqdm(self.progressbar)
+        if self.preserve_order:
             with tqdm(total=n_tasks) as pbar:
+                result_cache = {}
                 for return_task_idx in range(n_tasks):
-                    if self.preserve_order:
-                        while return_task_idx not in result_cache:
-                            log.debug(f'{return_task_idx} not in cached {list(result_cache.keys())}...')
-                            task_idx, result = self.result_queue.get()
-                            result_cache[task_idx] = result
-                            pbar.update(1)
-                        log.debug(f'Found {return_task_idx} in cache!')
-                        yield result_cache[return_task_idx]
-                        del result_cache[return_task_idx]
-                    else:
-                        yield self.result_queue.get()[1]
-                        pbar.update(1)
-        else:
-            for return_task_idx in range(n_tasks):
-                if self.preserve_order:
                     while return_task_idx not in result_cache:
                         log.debug(f'{return_task_idx} not in cached {list(result_cache.keys())}...')
                         task_idx, result = self.result_queue.get()
                         result_cache[task_idx] = result
+                        pbar.update(1)
                     log.debug(f'Found {return_task_idx} in cache!')
                     yield result_cache[return_task_idx]
                     del result_cache[return_task_idx]
-                else:
-                    yield self.result_queue.get()[1]
-
+        else:
+            with tqdm(total=n_tasks) as pbar:
+                for return_task_idx in range(n_tasks):
+                    task_idx, result = self.result_queue.get()
+                    yield result
+                    pbar.update(1)
         log.debug('All results are received!')
 
     def __call__(self, tasks: Iterable[Callable]) -> Generator:
