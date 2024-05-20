@@ -1,6 +1,12 @@
 # gpu_parallel
 Joblib-like interface for parallel GPU computations (e.g. data preprocessing).
 
+## Install
+```bash
+git clone https://github.com/vlivashkin/gpu_parallel.git
+cd gpu_parallel
+python3 -m pip install .
+```
 
 ## Basic usage
 ```python
