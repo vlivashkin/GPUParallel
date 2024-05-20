@@ -1,8 +1,8 @@
 import multiprocessing as mp
 import os
-import signal
-import subprocess
 from functools import partial
+
+import psutil
 
 log = mp.get_logger()
 

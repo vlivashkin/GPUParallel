@@ -1,12 +1,11 @@
 import logging
 from functools import partial
-from multiprocessing import Pool, Manager, Queue, active_children
 from typing import List, Iterable, Optional, Callable, Union, Generator
 
 from gpuparallel.utils import log, import_tqdm, kill_child_processes
 
 
-def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None):
+def _init_worker(gpu_queue: "Queue", init_fn: Optional[Callable] = None):
     global worker_id, device_id
 
     worker_id, device_id = gpu_queue.get()
@@ -20,7 +19,7 @@ def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None):
     log.debug(f"Worker #{worker_id} with GPU{device_id} initialized.")
 
 
-def _run_task(func: Callable, task_idx, result_queue: Queue, ignore_errors=True):
+def _run_task(func: Callable, task_idx, result_queue: "Queue", ignore_errors=True):
     global worker_id, device_id
 
     try:
@@ -47,6 +46,7 @@ class GPUParallel:
         pbar_description=None,
         ignore_errors=False,
         kill_all_children_on_exit=True,
+        engine="multiprocessing",
         debug=False,
     ):
         """
@@ -67,6 +67,7 @@ class GPUParallel:
         :param preserve_order: Return values with the same order as input.
         :param progressbar: Allow to use tqdm progressbar.
         :param ignore_errors: Either ignore errors inside tasks or raise them.
+        :param kill_all_children_on_exit: Force kill all children processes on exit.
         :param debug: When this parameter is True, parameters n_gpu and device_ids are ignored.
             Class creates only one worker ([device_id='cuda:0']) and run it in the same process (for better debugging).
 
@@ -78,7 +79,16 @@ class GPUParallel:
         self.progressbar = progressbar
         self.pbar_description = pbar_description
         self.ignore_errors = ignore_errors
+        self.kill_all_children_on_exit = kill_all_children_on_exit
+        self.engine = engine
         self.debug_mode = debug
+
+        if self.engine == "multiprocessing":
+            from multiprocessing import Pool, Manager
+        elif self.engine == "billiard":
+            from billiard import Pool, Manager
+        else:
+            raise NotImplementedError(self.engine)
 
         if device_ids is not None:
             assert len(device_ids) > 0, "len(device_ids) must be > 0"
@@ -123,6 +133,13 @@ class GPUParallel:
                     kill_child_processes()
             except Exception:
                 log.warning("Can't close and join process pool.", exc_info=True)
+
+        if self.engine == "multiprocessing":
+            from multiprocessing import active_children
+        elif self.engine == "billiard":
+            from billiard import active_children
+        else:
+            raise NotImplementedError(self.engine)
 
         children = active_children()
         if children:

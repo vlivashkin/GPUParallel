@@ -1,7 +1,6 @@
 from setuptools import setup
 
-# from gpuparallel import __version__
-__version__ = "1.0"
+from gpuparallel import __version__
 
 setup(
     name="gpuparallel",

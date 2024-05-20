@@ -6,9 +6,11 @@ name = "pypi"
 [packages]
 billiard = ">=3.6.3.0,<4.0"
 tqdm = "*"
+psutil = "*"
 
 [dev-packages]
 black = "*"
+numpy = "*"
 
 [requires]
 python_version = "3.12"
