@@ -9,3 +9,5 @@ __pycache__/
 /dist
 /docs/build/
 /gpuparallel.egg-info
+
+/tests/examples.py
