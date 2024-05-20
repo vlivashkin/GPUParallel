@@ -47,6 +47,6 @@ def perform(img, worker_id=None, gpu_id=None):
     result = model(img)
     return result
     
-gp = GPUParallel(n_gpu=2, n_workers_per_gpu=2, init_fn=init)
+gp = GPUParallel(n_gpu=16, n_workers_per_gpu=2, init_fn=init)
 results = gp(partial(perform, idx) for img in images_dataset)
 ```
