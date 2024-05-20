@@ -14,6 +14,9 @@ from gpuparallel import GPUParallel
 from functools import partial
 import multiprocessing as mp
 
+mp.log_to_stderr()
+mp.get_logger().setLevel('INFO')
+
 def perform(idx, worker_id=None, gpu_id=None):
     """
     Function to be performed on worker. Variables `worker_id` and `gpu_id` will be filled 
