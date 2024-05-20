@@ -35,14 +35,18 @@ class GPUParallel:
     def __init__(self, n_gpu=1, n_workers_per_gpu=1, init_fn: Optional[Callable] = None, verbose=True,
                  progressbar=True, ignore_errors=True):
         """
-        :param n_gpu: Number of GPUs to use. The library doesn't check if GPUs really available, it is simply provide
-                      consistent `worker_id` and `gpu_id` to both `init_fn` and task functions.
+        :param n_gpu:
+            Number of GPUs to use. The library doesn't check if GPUs really available, it is simply provide
+            consistent `worker_id` and ``gpu_id`` to both ``init_fn`` and task functions.
         :param n_workers_per_gpu: Number of workers on every GPU.
-        :param init_fn: Function which will be called during worker init.
-                        Function must have parameters `worker_id` and `gpu_id`.
-                        Helpful to init all common stuff (e.g. neural networks) here.
-        :param verbose: Allow additional messages. Note that messages inside `perform` should be sent to `mp.get_logger().info(message)`.
-                        To make them visible, you need to run `mp.log_to_stderr(); mp.get_logger().setLevel('INFO')`
+        :param init_fn:
+            Function which will be called during worker init.
+            Function must have parameters ``worker_id`` and ``gpu_id`` (or ``**kwargs``).
+            Helpful to init all common stuff (e.g. neural networks) here.
+        :param verbose:
+            Allow additional messages.
+            Note that messages inside ``perform`` should be sent to ``mp.get_logger().info(message)``.
+            To make them visible, you need to run ``mp.log_to_stderr(); mp.get_logger().setLevel('INFO')``
         :param progressbar: Allow to use tqdm progressbar.
         :param ignore_errors: Either ignore errors inside tasks or raise them.
         """
@@ -69,7 +73,7 @@ class GPUParallel:
     def __del__(self):
         """
         Created pool will be freed only during this destructor.
-        This allows to use __call__ multiple times with the same initialized workers.
+        This allows to use ``__call__`` multiple times with the same initialized workers.
         """
         self.pool.close()
         self.pool.join()
@@ -77,8 +81,10 @@ class GPUParallel:
     def __call__(self, tasks: Iterable) -> List:
         """
         Function which submits tasks for pool and collects the results of computations.
-        :param tasks: List or generator with callable functions to be executed.
-                      Functions should have parameters `worker_id` and `gpu_id`.
+
+        :param tasks:
+            List or generator with callable functions to be executed.
+            Functions must have parameters ``worker_id`` and ``gpu_id`` (or ``**kwargs``).
         :return: List of results
         """
         n_tasks = 0

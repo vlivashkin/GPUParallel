@@ -4,3 +4,5 @@ __pycache__/
 .idea
 .ipynb_checkpoint
 .DS_Store
+
+/docs/build/
