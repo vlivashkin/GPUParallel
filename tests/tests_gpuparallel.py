@@ -5,7 +5,7 @@ from typing import Generator
 
 from gpuparallel import GPUParallel, delayed, log_to_stderr
 
-log_to_stderr(log_level='INFO')
+log_to_stderr(log_level="INFO")
 
 
 def test_init__init(worker_id=None, **kwargs):
@@ -65,7 +65,7 @@ class TestGPUParallel(unittest.TestCase):
         self.assertEqual(true_seq, sorted(list(results)))
 
     def test_device_ids(self):
-        true_device_ids = ['cuda:3', 'cuda:4']
+        true_device_ids = ["cuda:3", "cuda:4"]
         gpup = GPUParallel(device_ids=true_device_ids, progressbar=False)
         results = gpup(delayed(task_return_device_id)() for _ in range(100))
         self.assertEqual(set(true_device_ids), set(results))
@@ -77,5 +77,5 @@ class TestGPUParallel(unittest.TestCase):
         self.assertEqual(true_sequence, list(results))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
