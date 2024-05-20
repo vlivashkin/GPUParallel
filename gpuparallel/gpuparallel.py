@@ -8,24 +8,24 @@ from .utils import log
 
 
 def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None):
-    global worker_id, gpu_id
+    global worker_id, device_id
 
-    worker_id, gpu_id = gpu_queue.get()
+    worker_id, device_id = gpu_queue.get()
     if init_fn is not None:
-        init_fn(worker_id=worker_id, gpu_id=gpu_id)
+        init_fn(worker_id=worker_id, device_id=device_id)
 
     if len(log.handlers) > 0:
-        fmt = logging.Formatter(f'[%(levelname)s/Worker-{worker_id}(GPU{gpu_id})]:%(message)s')
+        fmt = logging.Formatter(f'[%(levelname)s/Worker-{worker_id}(GPU{device_id})]:%(message)s')
         log.handlers[0].setFormatter(fmt)
 
-    log.debug(f'Worker #{worker_id} with GPU{gpu_id} initialized.')
+    log.debug(f'Worker #{worker_id} with GPU{device_id} initialized.')
 
 
 def _run_task(func: Callable, result_queue: Queue, ignore_errors=True):
-    global worker_id, gpu_id
+    global worker_id, device_id
 
     try:
-        result = func(worker_id=worker_id, gpu_id=gpu_id)
+        result = func(worker_id=worker_id, device_id=device_id)
         result_queue.put(result)
     except Exception as e:
         log.error(traceback.format_exc())
@@ -35,23 +35,44 @@ def _run_task(func: Callable, result_queue: Queue, ignore_errors=True):
 
 
 class GPUParallel:
-    def __init__(self, n_gpu=1, n_workers_per_gpu=1, init_fn: Optional[Callable] = None,
-                 return_generator=False, progressbar=True, ignore_errors=True):
+    def __init__(self, device_ids: Optional[List[str]] = None, n_gpu: Optional[Union[int, str]] = None,
+                 n_workers_per_gpu=1, init_fn: Optional[Callable] = None, return_generator=False, progressbar=True,
+                 ignore_errors=True, debug=False):
         """
+        Parallel execution of functions passed to ``__call__``.
+
+        :param device_ids:
+            List of gpu ids to use, e.g. ``['cuda:3', 'cuda:4']``. The library doesn't check if GPUs really available,
+            it simply provides consistent ``worker_id`` and ``device_id`` to both ``init_fn`` and task functions.
         :param n_gpu:
-            Number of GPUs to use. The library doesn't check if GPUs really available, it is simply provide
-            consistent ``worker_id`` and ``gpu_id`` to both ``init_fn`` and task functions.
-            ``n_gpu = 0`` turns on synced debug mode.
+            Number of GPUs to use, shortcut for ``device_ids=[f'cuda:{i}' for i in range(n_gpu)]``.
+            Both parameters ``n_gpu`` and ``device_ids`` can't be filled.
+            If neither of them filled, single ``cuda:0`` will be chosen.
         :param n_workers_per_gpu: Number of workers on every GPU.
         :param init_fn:
             Function which will be called during worker init.
-            Function must have parameters ``worker_id`` and ``gpu_id`` (or ``**kwargs``).
+            Function must have parameters ``worker_id`` and ``device_id`` (or ``**kwargs``).
             Helpful to init all common stuff (e.g. neural networks) here.
         :param progressbar: Allow to use tqdm progressbar.
         :param ignore_errors: Either ignore errors inside tasks or raise them.
+        :param debug: When this parameter is True, parameters n_gpu and device_ids are ignored.
+            Class creates only one worker ([device_id='cuda:0']) and run it in the same process (for better debugging).
+
         """
-        self.debug_mode = n_gpu == 0
-        self.n_gpu = n_gpu
+        assert not (n_gpu is not None and device_ids is not None), "Both 'n_gpu' and 'device_ids' cannot de filled"
+
+        self.debug_mode = debug
+        if not self.debug_mode:
+            if device_ids is not None:
+                assert len(device_ids) > 0, 'len(device_ids) must be > 0'
+                self.n_gpu = len(device_ids)
+                self.device_ids = device_ids
+            else:
+                n_gpu = n_gpu if n_gpu is not None else 1
+                assert n_gpu > 0, 'n_gpu must be > 0'
+                self.n_gpu = n_gpu
+                self.device_ids = [f'cuda:{idx}' for idx in range(n_gpu)]
+
         self.n_workers_per_gpu = n_workers_per_gpu
         self.return_generator = return_generator
         self.progressbar = progressbar
@@ -60,10 +81,10 @@ class GPUParallel:
         if not self.debug_mode:
             m = Manager()
             self.gpu_queue = m.Queue()
-            for gpu_id in range(self.n_gpu):
+            for device_idx in range(self.n_gpu):
                 for idx in range(self.n_workers_per_gpu):
-                    worker_id = gpu_id * self.n_workers_per_gpu + idx
-                    self.gpu_queue.put((worker_id, gpu_id))
+                    worker_id = device_idx * self.n_workers_per_gpu + idx
+                    self.gpu_queue.put((worker_id, self.device_ids[device_idx]))
 
             initializer = partial(_init_worker, gpu_queue=self.gpu_queue, init_fn=init_fn)
             self.pool = Pool(processes=self.n_gpu * self.n_workers_per_gpu, initializer=initializer,
@@ -71,9 +92,9 @@ class GPUParallel:
 
             self.result_queue = m.Queue()
         else:  # debug mode; run init in the same process
-            log.warning('n_gpu=0 leads to Debug mode. All tasks will be run sync for debug purposes.')
+            log.warning('Debug mode. All tasks will be run in this process for debug purposes.')
             if init_fn is not None:
-                init_fn(worker_id=0, gpu_id=0)
+                init_fn(worker_id=0, device_id=self.device_ids[0])
 
     def __del__(self):
         """
@@ -92,7 +113,7 @@ class GPUParallel:
             from tqdm.auto import tqdm
             tasks = tqdm(tasks)
         for task in tasks:
-            yield task(worker_id=0, gpu_id=0)
+            yield task(worker_id=0, device_id=self.device_ids[0])
 
     def _call_async(self, tasks: Iterable) -> Iterable:
         n_tasks = 0
@@ -113,13 +134,13 @@ class GPUParallel:
 
         log.debug('All results are received!')
 
-    def __call__(self, tasks: Iterable) -> Union[List, Generator]:
+    def __call__(self, tasks: Iterable[Callable]) -> Union[List, Generator]:
         """
         Function which submits tasks for pool and collects the results of computations.
 
         :param tasks:
             List or generator with callable functions to be executed.
-            Functions must have parameters ``worker_id`` and ``gpu_id`` (or ``**kwargs``).
+            Functions must have parameters ``worker_id`` and ``device_id`` (or ``**kwargs``).
         :return: List of results or generator
         """
 
