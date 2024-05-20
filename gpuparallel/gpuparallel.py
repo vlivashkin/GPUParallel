@@ -161,7 +161,7 @@ class GPUParallel:
                     del result_cache[return_task_idx]
         else:
             with tqdm(total=n_tasks, desc=self.pbar_description) as pbar:
-                for return_task_idx in range(n_tasks):
+                for _ in range(n_tasks):
                     task_idx, result = self.result_queue.get()
                     yield result
                     pbar.update(1)
