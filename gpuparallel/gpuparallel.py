@@ -36,7 +36,7 @@ def _run_task(func: Callable, task_idx, result_queue: Queue, ignore_errors=True)
 
 class GPUParallel:
     def __init__(self, device_ids: Optional[List[str]] = None, n_gpu: Optional[Union[int, str]] = None,
-                 n_workers_per_gpu=1, init_fn: Optional[Callable] = None, preserve_order=True, return_generator=False,
+                 n_workers_per_gpu=1, init_fn: Optional[Callable] = None, preserve_order=True,
                  progressbar=True, ignore_errors=True, debug=False):
         """
         Parallel execution of functions passed to ``__call__``.
@@ -63,7 +63,6 @@ class GPUParallel:
         assert not (n_gpu is not None and device_ids is not None), "Both 'n_gpu' and 'device_ids' cannot de filled"
 
         self.n_workers_per_gpu = n_workers_per_gpu
-        self.return_generator = return_generator
         self.preserve_order = preserve_order
         self.progressbar = progressbar
         self.ignore_errors = ignore_errors
@@ -116,7 +115,7 @@ class GPUParallel:
         for task in tasks:
             yield task(worker_id=0, device_id=self.device_ids[0])
 
-    def _call_async(self, tasks: Iterable) -> Iterable:
+    def _call_async(self, tasks: Iterable) -> Generator:
         n_tasks = 0
         for task_idx, task in enumerate(tasks):
             self.pool.apply_async(_run_task, (task, task_idx, self.result_queue, self.ignore_errors))
@@ -155,7 +154,7 @@ class GPUParallel:
 
         log.debug('All results are received!')
 
-    def __call__(self, tasks: Iterable[Callable]) -> Union[List, Generator]:
+    def __call__(self, tasks: Iterable[Callable]) -> Generator:
         """
         Function which submits tasks for pool and collects the results of computations.
 
@@ -165,5 +164,4 @@ class GPUParallel:
         :return: List of results or generator
         """
 
-        generator = self._call_async(tasks) if not self.debug_mode else self._call_sync(tasks)
-        return generator if self.return_generator else [x for x in generator]
+        return self._call_async(tasks) if not self.debug_mode else self._call_sync(tasks)
