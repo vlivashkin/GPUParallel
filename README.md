@@ -14,14 +14,16 @@ def perform(idx, gpu_id, **kwargs):
     return (tensor * tensor).item()
 
 result = GPUParallel(n_gpu=2)(delayed(perform)(idx) for idx in range(5))
-print(sorted(result))  # [0.0, 1.0, 4.0, 9.0, 16.0]
+print(result)  # [0.0, 1.0, 4.0, 9.0, 16.0]
 ```
 
 Features:
-* [Initialize networks on worker init](#initialize-networks-on-worker-init)
+* [Initialize networks once on worker init](#initialize-networks-once-on-worker-init)
 * [Reuse initialized workers](#reuse-initialized-workers)
+* Preserve sample order: `preserve_order` flag
+* Auto batching: class `BatchGPUParallel`
 * [Simple logging from workers](#simple-logging-from-workers)
-* Sync mode for tasks debug (use `n_gpu = 0`)
+* Main process inference mode for tasks debug (use `debug = True`)
 * Progressbar with [tqdm](https://github.com/tqdm/tqdm): `progressbar` flag
 * Optional ignoring task errors: `ignore_errors` flag
 
@@ -33,7 +35,7 @@ python3 -m pip install git+git://github.com/vlivashkin/gpuparallel.git
 ```
 
 ## Examples
-### Initialize networks on worker init
+### Initialize networks once on worker init
 Function `init_fn` is called on init of every worker. All common resources (e.g. networks) can be initialized here.
 
 ```python
