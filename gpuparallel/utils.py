@@ -7,7 +7,7 @@ from functools import partial
 log = mp.get_logger()
 
 
-def log_to_stderr(log_level='INFO', force=False):
+def log_to_stderr(log_level="INFO", force=False):
     """
     Shortcut allowing to display logs from workers.
 
@@ -56,6 +56,7 @@ def import_tqdm(progressbar=True):
     if progressbar:
         try:
             from tqdm.auto import tqdm
+
             return tqdm
         except ImportError:
             log.warning("Can't load tqdm")
