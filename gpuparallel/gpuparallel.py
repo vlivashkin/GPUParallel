@@ -3,7 +3,7 @@ from functools import partial
 from multiprocessing import Pool, Manager, Queue, active_children
 from typing import List, Iterable, Optional, Callable, Union, Generator
 
-from gpuparallel.utils import log, import_tqdm
+from gpuparallel.utils import log, import_tqdm, kill_child_processes
 
 
 def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None):
