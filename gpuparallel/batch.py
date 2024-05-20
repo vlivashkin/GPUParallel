@@ -33,18 +33,14 @@ class BatchGPUParallel(GPUParallel):
         """
         n_samples = len(args[0]) if len(args) > 0 else len(kwargs[list(kwargs.keys())[0]])
         n_batches = math.ceil(n_samples / self.batch_size)
+
         will_be_batched_args, will_be_batched_kwargs = set(), set()
         wont_be_batched_args, wont_be_batched_kwargs = set(), set()
+        is_batched = lambda arg: hasattr(arg, '__len__') and len(arg) == n_samples
         for arg_idx, arg in enumerate(args):
-            if hasattr(arg, '__len__') and len(arg) == n_samples:
-                will_be_batched_args.add(arg_idx)
-            else:
-                wont_be_batched_args.add(arg_idx)
+            (will_be_batched_args if is_batched(arg) else wont_be_batched_args).add(arg_idx)
         for kwarg_key, kwarg_value in kwargs.items():
-            if hasattr(kwarg_value, '__len__') and len(kwarg_value) == n_samples:
-                will_be_batched_kwargs.add(kwarg_key)
-            else:
-                wont_be_batched_kwargs.add(kwarg_key)
+            (will_be_batched_kwargs if is_batched(kwarg_value) else wont_be_batched_kwargs).add(kwarg_key)
         log.info(f'Args: {will_be_batched_args} will be batched, {wont_be_batched_args} will be copied')
         log.info(f'Kwargs: {will_be_batched_kwargs} will be batched, {wont_be_batched_kwargs} will be copied')
         log.info(f'Total samples: {n_samples}, batches: {n_batches}')
