@@ -5,23 +5,23 @@ from functools import partial
 from gpuparallel import GPUParallel
 
 
-def test_init__init(worker_id=None, gpu_id=None):
+def test_init__init(worker_id=None, **kwargs):
     global result
     result = worker_id
 
 
-def test_init__perform(worker_id=None, gpu_id=None):
+def test_init__perform(**kwargs):
     global result
     mp.get_logger().info(f'Perform {result}')
     return result
 
 
-def test_results__perform(idx, worker_id=None, gpu_id=None):
+def test_results__perform(idx, **kwargs):
     mp.get_logger().info(f'Perform {idx}')
     return idx
 
 
-def test_multicall__perform(idx, worker_id=None, gpu_id=None):
+def test_multicall__perform(idx, **kwargs):
     mp.get_logger().info(f'Perform {idx}')
     return idx
 

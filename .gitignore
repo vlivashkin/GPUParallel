@@ -5,4 +5,7 @@ __pycache__/
 .ipynb_checkpoint
 .DS_Store
 
+/build
+/dist
 /docs/build/
+/gpuparallel.egg-info

@@ -1,8 +1,10 @@
 from setuptools import setup
 
+from gpuparallel import __version__
+
 setup(
     name='gpuparallel',
-    version='0.0.1',
+    version=__version__,
     description='Joblib-like interface for parallel GPU computations (e.g. data preprocessing)',
     url='',
     author='Vladimir Ivashkin',
