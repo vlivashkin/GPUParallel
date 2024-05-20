@@ -35,7 +35,7 @@ class GPUParallel:
         """
         :param n_gpu:
             Number of GPUs to use. The library doesn't check if GPUs really available, it is simply provide
-            consistent `worker_id` and ``gpu_id`` to both ``init_fn`` and task functions.
+            consistent ``worker_id`` and ``gpu_id`` to both ``init_fn`` and task functions.
         :param n_workers_per_gpu: Number of workers on every GPU.
         :param init_fn:
             Function which will be called during worker init.
