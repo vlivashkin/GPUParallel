@@ -1,19 +1,24 @@
-import multiprocessing as mp
+import logging
 import traceback
 from functools import partial
 from multiprocessing import Pool, Manager, Queue
 from typing import List, Iterable, Optional, Callable
 
+from .utils import log
 
-def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None, verbose=True):
+
+def _init_worker(gpu_queue: Queue, init_fn: Optional[Callable] = None):
     global worker_id, gpu_id
 
     worker_id, gpu_id = gpu_queue.get()
     if init_fn is not None:
         init_fn(worker_id=worker_id, gpu_id=gpu_id)
 
-    if verbose:
-        mp.get_logger().info(f'Worker #{worker_id} with GPU{gpu_id} initialized.')
+    if len(log.handlers) > 0:
+        fmt = logging.Formatter(f'[%(levelname)s/Worker-{worker_id}(GPU{gpu_id})]:%(message)s')
+        log.handlers[0].setFormatter(fmt)
+
+    log.debug(f'Worker #{worker_id} with GPU{gpu_id} initialized.')
 
 
 def _run_task(func: Callable, result_queue: Queue, ignore_errors=True):
@@ -23,14 +28,14 @@ def _run_task(func: Callable, result_queue: Queue, ignore_errors=True):
         result = func(worker_id=worker_id, gpu_id=gpu_id)
         result_queue.put(result)
     except Exception as e:
-        mp.get_logger().error(traceback.format_exc())
+        log.error(traceback.format_exc())
         result_queue.put(None)  # __call__ expects to get number of results equal to number of tasks
         if not ignore_errors:
             raise
 
 
 class GPUParallel:
-    def __init__(self, n_gpu=1, n_workers_per_gpu=1, init_fn: Optional[Callable] = None, verbose=True,
+    def __init__(self, n_gpu=1, n_workers_per_gpu=1, init_fn: Optional[Callable] = None,
                  progressbar=True, ignore_errors=True):
         """
         :param n_gpu:
@@ -42,18 +47,12 @@ class GPUParallel:
             Function which will be called during worker init.
             Function must have parameters ``worker_id`` and ``gpu_id`` (or ``**kwargs``).
             Helpful to init all common stuff (e.g. neural networks) here.
-        :param verbose:
-            Allow additional messages.
-            Note that messages inside ``perform`` should be sent to ``mp.get_logger().info(message)``.
-            To make them visible, you need to run ``mp.log_to_stderr(); mp.get_logger().setLevel('INFO')``
         :param progressbar: Allow to use tqdm progressbar.
         :param ignore_errors: Either ignore errors inside tasks or raise them.
         """
         self.debug_mode = n_gpu == 0
         self.n_gpu = n_gpu
         self.n_workers_per_gpu = n_workers_per_gpu
-        self.init_fn = init_fn
-        self.verbose = verbose
         self.progressbar = progressbar
         self.ignore_errors = ignore_errors
 
@@ -65,13 +64,15 @@ class GPUParallel:
                     worker_id = gpu_id * self.n_workers_per_gpu + idx
                     self.gpu_queue.put((worker_id, gpu_id))
 
-            initializer = partial(_init_worker, gpu_queue=self.gpu_queue, init_fn=init_fn, verbose=self.verbose)
+            initializer = partial(_init_worker, gpu_queue=self.gpu_queue, init_fn=init_fn)
             self.pool = Pool(processes=self.n_gpu * self.n_workers_per_gpu, initializer=initializer,
                              maxtasksperchild=None)
 
             self.result_queue = m.Queue()
         else:  # debug mode; run init in the same process
-            init_fn(worker_id=0, gpu_id=0)
+            log.warning('n_gpu=0 leads to Debug mode. All tasks will be run sync for debug purposes.')
+            if init_fn is not None:
+                init_fn(worker_id=0, gpu_id=0)
 
     def __del__(self):
         """
@@ -109,8 +110,7 @@ class GPUParallel:
             self.pool.apply_async(_run_task, (task, self.result_queue, self.ignore_errors))
             n_tasks += 1
 
-        if self.verbose:
-            print(f'Submitted {n_tasks} tasks')
+        log.debug(f'Submitted {n_tasks} tasks')
 
         results = []
         if self.progressbar:
@@ -125,7 +125,6 @@ class GPUParallel:
                 result = self.result_queue.get()
                 results.append(result)
 
-        if self.verbose:
-            print('All results are received!')
+        log.debug('All results are received!')
 
         return results
