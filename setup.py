@@ -15,5 +15,6 @@ setup(
     packages=['gpuparallel'],
     install_requires=[
         'tqdm',
+        'billiard',
     ],
 )
