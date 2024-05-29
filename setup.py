@@ -1,10 +1,11 @@
 from setuptools import setup
 
-from gpuparallel import __version__
+# this lead import of all package during installation and as a result, break install
+# from gpuparallel import __version__
 
 setup(
     name="gpuparallel",
-    version=__version__,
+    version="0.2.3",
     description="Joblib-like interface for parallel GPU computations (e.g. data preprocessing)",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",

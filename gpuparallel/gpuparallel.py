@@ -2,7 +2,7 @@ from functools import partial
 from typing import List, Iterable, Optional, Callable, Union, Generator
 
 from gpuparallel.exceptions import GPUPPoolException, GPUPWorkerException, GPUPWorkerNotInitializedException
-from gpuparallel.utils import log, import_tqdm, kill_child_processes
+from gpuparallel.utils import log, import_tqdm
 from gpuparallel.worker import _init_worker, _run_task
 
 
@@ -17,7 +17,6 @@ class GPUParallel:
         progressbar=True,
         pbar_description=None,
         ignore_errors=False,
-        kill_all_children_on_exit=True,
         engine="multiprocessing",
         debug=False,
     ):
@@ -39,7 +38,6 @@ class GPUParallel:
         :param preserve_order: Return values with the same order as input.
         :param progressbar: Allow to use tqdm progressbar.
         :param ignore_errors: Either ignore errors inside tasks or raise them.
-        :param kill_all_children_on_exit: Force kill all children processes on exit.
         :param debug: When this parameter is True, parameters n_gpu and device_ids are ignored.
             Class creates only one worker ([device_id='cuda:0']) and run it in the same process (for better debugging).
 
@@ -51,7 +49,6 @@ class GPUParallel:
         self.progressbar = progressbar
         self.pbar_description = pbar_description
         self.ignore_errors = ignore_errors
-        self.kill_all_children_on_exit = kill_all_children_on_exit
         self.engine = engine
         self.debug_mode = debug
 
@@ -101,8 +98,6 @@ class GPUParallel:
                 self._manager.shutdown()
                 self.pool.close()
                 self.pool.join()
-                if self.kill_all_children_on_exit:
-                    kill_child_processes()
             except Exception:
                 log.warning("Can't close and join process pool.", exc_info=True)
 
