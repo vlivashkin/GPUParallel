@@ -38,7 +38,7 @@ def _run_task(func: Callable, task_idx, result_queue: "Queue"):
 
     if is_broken:
         log.error("Current worker is in broken state, it will return GPUPWorkerNotInitializedException")
-        result_queue.put((task_idx, GPUPWorkerNotInitializedException))
+        result_queue.put((task_idx, GPUPWorkerNotInitializedException()))
         return
 
     log.debug(f"Start task {task_idx}")
