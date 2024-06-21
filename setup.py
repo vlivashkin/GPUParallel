@@ -16,6 +16,6 @@ setup(
     packages=["gpuparallel"],
     install_requires=["tqdm", "psutil"],
     extras_require={
-        "billiard": ["billiard>=3.6.3.0,<4.0"],
+        "billiard": ["billiard>=3.6.4.0,<=4.2.0"],
     },
 )
